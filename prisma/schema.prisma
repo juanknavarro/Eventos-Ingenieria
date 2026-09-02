@@ -1,0 +1,158 @@
+// Prisma Schema for University Engineering Faculty Events Platform
+// (Plataforma de Gestión de Eventos Universitarios - Facultad de Ingenierías)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum RolUsuario {
+  ADMIN
+  PROFESOR
+  STAFF
+  ALUMNO
+}
+
+enum EstadoEvento {
+  BORRADOR
+  PUBLICADO
+  EN_CURSO
+  FINALIZADO
+  CANCELADO
+}
+
+enum EstadoPago {
+  PENDIENTE
+  PAGADO
+  EXENTO
+  RECHAZADO
+}
+
+enum MetodoAsistencia {
+  QR
+  MANUAL
+  BIOMETRICO
+}
+
+// ==========================================
+// MODELS
+// ==========================================
+
+model Usuario {
+  id                String      @id @default(cuid())
+  nombre            String
+  email             String      @unique
+  passwordHash      String?
+  rol               RolUsuario  @default(ALUMNO)
+  telefono          String?
+  cedula            String?     // Cédula de ciudadanía o documento
+  codigoEstudiantil String?     @unique // Código de estudiante o cédula docente
+  carrera           String?     // Ej. Ingeniería de Sistemas, Ingeniería Industrial, etc.
+  semestre          String?     // Ej. "8vo Semestre", "6to Semestre"
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relaciones
+  eventosOrganizados         Evento[]      @relation("OrganizadorEvento")
+  inscripciones              Inscripcion[] @relation("UsuarioInscrito")
+  inscripcionesComoProfesor  Inscripcion[] @relation("ProfesorResponsable")
+  asistenciasRegistradas     Asistencia[]  @relation("StaffRegistroAsistencia")
+
+  @@map("usuarios")
+}
+
+model Evento {
+  id              String       @id @default(cuid())
+  titulo          String
+  descripcion     String
+  fechaInicio     DateTime
+  fechaFin        DateTime
+  ubicacion       String       // Ej. "Auditorio Principal", "Laboratorio 3"
+  capacidadMaxima Int?
+  precio          Float        @default(0.0) // 0.0 para eventos gratuitos
+  estado          EstadoEvento @default(BORRADOR)
+  imagenUrl            String?
+  logo_fondo_url       String?      // Imagen decorativa o logo de fondo superior para escarapelas
+  logo_universidad_url String?      // URL o ruta al logo oficial de la Universidad del Sinú
+  imagen_central_url   String?      // Imagen temática central alusiva al evento
+  sponsors_url         String?      // Imagen o franja de patrocinadores oficiales
+  organizadorId        String
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  // Relaciones
+  organizador   Usuario       @relation("OrganizadorEvento", fields: [organizadorId], references: [id], onDelete: Restrict)
+  inscripciones Inscripcion[]
+
+  @@map("eventos")
+}
+
+model Inscripcion {
+  id                          String     @id @default(cuid())
+  eventoId                    String
+  usuarioId                   String
+  
+  // Campos solicitados específicamente para gestión académica y financiera
+  asignatura_bonificacion     String?    // Asignatura donde se aplicará la bonificación académica
+  profesor_responsable_dinero String?    // Nombre/descripción del docente encargado de recaudar/validar
+  profesorResponsableId       String?    // Relación referencial opcional al usuario docente
+  estado_pago                 EstadoPago @default(PENDIENTE)
+  
+  montoPagado                 Float      @default(0.0)
+  comprobanteUrl              String?    // URL o referencia al recibo de pago
+  fechaInscripcion            DateTime   @default(now())
+  createdAt                   DateTime   @default(now())
+  updatedAt                   DateTime   @updatedAt
+
+  // Relaciones
+  evento              Evento      @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  usuario             Usuario     @relation("UsuarioInscrito", fields: [usuarioId], references: [id], onDelete: Cascade)
+  profesorResponsable Usuario?    @relation("ProfesorResponsable", fields: [profesorResponsableId], references: [id], onDelete: SetNull)
+  asistencia          Asistencia?
+
+  // Restricción única: Un usuario no puede inscribirse más de una vez al mismo evento
+  @@unique([eventoId, usuarioId])
+  @@map("inscripciones")
+}
+
+model Asistencia {
+  id                 String           @id @default(cuid())
+  inscripcionId      String           @unique
+  fechaHoraRegistro  DateTime         @default(now())
+  registradoPorId    String?          // Usuario (STAFF/PROFESOR/ADMIN) que validó la entrada
+  metodo             MetodoAsistencia @default(QR)
+  observaciones      String?
+  createdAt          DateTime         @default(now())
+
+  // Relaciones
+  inscripcion   Inscripcion @relation(fields: [inscripcionId], references: [id], onDelete: Cascade)
+  registradoPor Usuario?    @relation("StaffRegistroAsistencia", fields: [registradoPorId], references: [id], onDelete: SetNull)
+
+  @@map("asistencias")
+}
+
+// Configuración global de plantillas de certificados y escarapelas
+model ConfiguracionPlantillas {
+  id               String   @id @default("global_config")
+  logo_url         String   @default("/imagen_2.png")
+  firma_decano_url String?  // URL o imagen de la firma escaneada del decano
+  nombre_decano    String   @default("Ing. Roberto Gómez")
+  cargo_firmante   String   @default("Decano de Ingenierías")
+  color_primario   String   @default("#0B305B") // Azul Marino Institucional
+  color_secundario String   @default("#D2202E") // Rojo Institucional
+  updatedAt        DateTime @updatedAt
+  createdAt        DateTime @default(now())
+
+  @@map("configuracion_plantillas")
+}
+
+
