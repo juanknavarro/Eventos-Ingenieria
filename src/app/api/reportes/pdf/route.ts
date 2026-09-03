@@ -4,12 +4,14 @@ import { getAuthSession } from '@/lib/auth/session'
 import { obtenerConfiguracionPlantillas } from '@/lib/config/plantillas'
 import { generarPdfInformeEjecutivo } from '@/lib/pdf/generadorInformeEjecutivo'
 
+import { esAdminOSuperior, esSuperAdmin, filtroInscripcionesPorTenancy } from '@/lib/auth/multitenancy'
+
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
     const session = await getAuthSession()
-    if (!session || session.rol !== 'ADMIN') {
+    if (!session || !esAdminOSuperior(session)) {
       return new NextResponse('Acceso denegado. Se requiere rol de Administrador.', { status: 403 })
     }
 
@@ -19,11 +21,18 @@ export async function GET(request: NextRequest) {
     const config = await obtenerConfiguracionPlantillas()
 
     let tituloEvento = 'Todos los Eventos Académicos'
-    let ubicacion = 'Facultad de Ciencias e Ingenierías'
+    let ubicacion = esSuperAdmin(session) ? 'Facultad de Ciencias e Ingenierías' : (session.carrera || 'Facultad de Ciencias e Ingenierías')
     let rangoFechas = 'Consolidado General 2026'
 
-    const whereInscripcion = eventoId && eventoId !== 'todos' ? { eventoId } : {}
-    const whereAsistencia = eventoId && eventoId !== 'todos' ? { inscripcion: { eventoId } } : {}
+    const filtroTenancy = filtroInscripcionesPorTenancy(session)
+    const whereInscripcion =
+      eventoId && eventoId !== 'todos'
+        ? { AND: [{ eventoId }, filtroTenancy] }
+        : filtroTenancy
+    const whereAsistencia =
+      eventoId && eventoId !== 'todos'
+        ? { AND: [{ inscripcion: { eventoId } }, { inscripcion: filtroTenancy }] }
+        : { inscripcion: filtroTenancy }
 
     if (eventoId && eventoId !== 'todos') {
       const evento = await prisma.evento.findUnique({

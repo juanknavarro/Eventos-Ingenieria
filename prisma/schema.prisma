@@ -16,6 +16,7 @@ datasource db {
 // ==========================================
 
 enum RolUsuario {
+  SUPER_ADMIN
   ADMIN
   PROFESOR
   STAFF
@@ -57,6 +58,8 @@ model Usuario {
   cedula            String?     // Cédula de ciudadanía o documento
   codigoEstudiantil String?     @unique // Código de estudiante o cédula docente
   carrera           String?     // Ej. Ingeniería de Sistemas, Ingeniería Industrial, etc.
+  programaId        String?
+  programa          Programa?   @relation(fields: [programaId], references: [id], onDelete: SetNull)
   semestre          String?     // Ej. "8vo Semestre", "6to Semestre"
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
@@ -85,6 +88,9 @@ model Evento {
   logo_universidad_url String?      // URL o ruta al logo oficial de la Universidad del Sinú
   imagen_central_url   String?      // Imagen temática central alusiva al evento
   sponsors_url         String?      // Imagen o franja de patrocinadores oficiales
+  programa_academico   String?      @default("Facultad de Ingenierías") // Programa académico (Multi-Tenancy)
+  programaId           String?
+  programa             Programa?    @relation(fields: [programaId], references: [id], onDelete: SetNull)
   organizadorId        String
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
@@ -150,6 +156,11 @@ model ConfiguracionPlantillas {
   cargo_firmante   String   @default("Decano de Ingenierías")
   color_primario   String   @default("#0B305B") // Azul Marino Institucional
   color_secundario String   @default("#D2202E") // Rojo Institucional
+
+  // Textos dinámicos de la convocatoria en la página principal pública
+  titulo_convocatoria      String   @default("Convocatoria Académica Abierta")
+  descripcion_convocatoria String   @default("Explora la oferta académica de la Universidad del Sinú. Inscríbete con tu número de documento, asegura tu cupo y expande tus conocimientos en nuestros espacios de formación continua.")
+
   updatedAt        DateTime @updatedAt
   createdAt        DateTime @default(now())
 
@@ -158,14 +169,33 @@ model ConfiguracionPlantillas {
 
 // Asignaturas académicas para bonificaciones
 model Asignatura {
-  id                 String   @id @default(cuid())
+  id                 String    @id @default(cuid())
   nombre             String
-  programa_academico String   // Ej. "Ingeniería de Sistemas", "Ingeniería Industrial", etc.
-  activa             Boolean  @default(true)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  programa_academico String    // Ej. "Ingeniería de Sistemas", "Ingeniería Industrial", etc.
+  programaId         String?
+  programa           Programa? @relation(fields: [programaId], references: [id], onDelete: SetNull)
+  activa             Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   @@map("asignaturas")
 }
+
+// Programas académicos de la Facultad de Ingenierías
+model Programa {
+  id            String       @id @default(cuid())
+  nombre        String       @unique
+  estado_activo Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  // Relaciones formales
+  usuarios      Usuario[]
+  eventos       Evento[]
+  asignaturas   Asignatura[]
+
+  @@map("programas")
+}
+
 
 

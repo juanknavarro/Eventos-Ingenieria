@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
 import {
   Calendar,
@@ -28,6 +28,9 @@ import {
   Save,
   BarChart3,
   BookOpen,
+  Sparkles,
+  Globe,
+  Building2,
 } from 'lucide-react'
 import { RolUsuario, EstadoEvento } from '@prisma/client'
 import {
@@ -55,6 +58,7 @@ interface EventoData {
   logo_fondo_url: string | null
   imagen_central_url: string | null
   sponsors_url: string | null
+  programa_academico?: string | null
   _count?: {
     inscripciones: number
   }
@@ -72,6 +76,21 @@ interface UsuarioData {
   createdAt: Date | string
 }
 
+export interface ProgramaItemSimple {
+  id: string
+  nombre: string
+}
+
+export interface InscripcionMetricaSimple {
+  id: string
+  eventoId: string
+  usuarioId: string
+  estado_pago: string
+  montoPagado: number
+  carreraUsuario?: string | null
+  programaEvento?: string | null
+}
+
 interface Props {
   eventos: EventoData[]
   usuarios: UsuarioData[]
@@ -79,7 +98,13 @@ interface Props {
   adminActual: {
     nombre: string
     email: string
+    rol: RolUsuario
+    carrera: string | null
   }
+  programas?: ProgramaItemSimple[]
+  inscripciones?: InscripcionMetricaSimple[]
+  totalInscripcionesInicial?: number
+  totalRecaudadoInicial?: number
 }
 
 export default function PanelAdminCliente({
@@ -87,8 +112,14 @@ export default function PanelAdminCliente({
   usuarios,
   configPlantillas,
   adminActual,
+  programas = [],
+  inscripciones = [],
+  totalInscripcionesInicial = 0,
+  totalRecaudadoInicial = 0,
 }: Props) {
+  const esSuperAdmin = adminActual.rol === 'SUPER_ADMIN'
   const [tabActiva, setTabActiva] = useState<'eventos' | 'usuarios' | 'plantillas'>('eventos')
+  const [programaSeleccionado, setProgramaSeleccionado] = useState<string>('todos')
 
   // Estados de notificación y carga
   const [mensajeExito, setMensajeExito] = useState<string | null>(null)
@@ -113,6 +144,13 @@ export default function PanelAdminCliente({
   )
   const [cargoFirmanteInput, setCargoFirmanteInput] = useState(
     configPlantillas?.cargo_firmante || 'Decano Facultad de Ciencias e Ingenierías'
+  )
+  const [tituloConvocatoriaInput, setTituloConvocatoriaInput] = useState(
+    configPlantillas?.titulo_convocatoria || 'Convocatoria Académica Abierta'
+  )
+  const [descripcionConvocatoriaInput, setDescripcionConvocatoriaInput] = useState(
+    configPlantillas?.descripcion_convocatoria ||
+      'Explora la oferta académica de la Universidad del Sinú. Inscríbete con tu número de documento, asegura tu cupo y expande tus conocimientos en nuestros espacios de formación continua.'
   )
 
   const mostrarMensaje = (exito: boolean, texto: string) => {
@@ -206,7 +244,53 @@ export default function PanelAdminCliente({
     mostrarMensaje(res.success, res.message || res.error || '')
   }
 
-  const usuariosFiltrados = usuarios.filter((u) => {
+  // Filtrar eventos por programa académico seleccionado
+  const eventosFiltrados = useMemo(() => {
+    if (programaSeleccionado === 'todos') return eventos
+    return eventos.filter(
+      (e) =>
+        e.programa_academico?.toLowerCase().includes(programaSeleccionado.toLowerCase()) ||
+        e.titulo?.toLowerCase().includes(programaSeleccionado.toLowerCase())
+    )
+  }, [eventos, programaSeleccionado])
+
+  // Filtrar usuarios por programa académico seleccionado
+  const usuariosPorPrograma = useMemo(() => {
+    if (programaSeleccionado === 'todos') return usuarios
+    return usuarios.filter((u) =>
+      u.carrera?.toLowerCase().includes(programaSeleccionado.toLowerCase())
+    )
+  }, [usuarios, programaSeleccionado])
+
+  // Cálculo dinámico de métricas para los 4 KPIs
+  const metricasCalculadas = useMemo(() => {
+    if (!inscripciones || inscripciones.length === 0) {
+      return {
+        totalInscripciones: totalInscripcionesInicial || 0,
+        totalRecaudado: totalRecaudadoInicial || 0,
+      }
+    }
+    if (programaSeleccionado === 'todos') {
+      return {
+        totalInscripciones: inscripciones.length,
+        totalRecaudado: inscripciones
+          .filter((i) => i.estado_pago === 'PAGADO')
+          .reduce((acc, curr) => acc + curr.montoPagado, 0),
+      }
+    }
+    const filtradas = inscripciones.filter((i) =>
+      (i.carreraUsuario && i.carreraUsuario.toLowerCase().includes(programaSeleccionado.toLowerCase())) ||
+      (i.programaEvento && i.programaEvento.toLowerCase().includes(programaSeleccionado.toLowerCase()))
+    )
+    return {
+      totalInscripciones: filtradas.length,
+      totalRecaudado: filtradas
+        .filter((i) => i.estado_pago === 'PAGADO')
+        .reduce((acc, curr) => acc + curr.montoPagado, 0),
+    }
+  }, [inscripciones, programaSeleccionado, totalInscripcionesInicial, totalRecaudadoInicial])
+
+  const usuariosFiltrados = usuariosPorPrograma.filter((u) => {
     const q = busquedaUsuario.toLowerCase()
     return (
       u.nombre.toLowerCase().includes(q) ||
@@ -218,6 +302,110 @@ export default function PanelAdminCliente({
 
   return (
     <div className="space-y-6">
+      {/* Banner de Bienvenida, Selector Global 'Vista de Programa' y KPIs Dinámicos */}
+      <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs space-y-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-extrabold text-[#D2202E]">
+                {esSuperAdmin
+                  ? 'SUPER ADMINISTRADOR (VISIÓN GLOBAL)'
+                  : `ADMINISTRADOR DE PROGRAMA • ${adminActual.carrera || 'Jefe de Departamento'}`}
+              </span>
+              <span className="text-slate-400">&bull;</span>
+              <span className="text-xs text-slate-500 font-medium">
+                {adminActual.email}
+              </span>
+            </div>
+            <h2 className="text-xl font-extrabold text-[#0B305B] tracking-tight mt-0.5">
+              Bienvenido, {adminActual.nombre}
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              {esSuperAdmin
+                ? 'Control centralizado global de eventos, directores de programa y personalización institucional.'
+                : `Control departamental de eventos, aprobación docente y seguimiento para ${adminActual.carrera || 'el programa'}.`}
+            </p>
+          </div>
+
+          {/* SELECTOR GLOBAL 'VISTA DE PROGRAMA' (Exclusivo SUPER_ADMIN) */}
+          <div className="flex flex-wrap items-center gap-3">
+            {esSuperAdmin && (
+              <div className="flex items-center gap-2 bg-slate-50 border-2 border-slate-200 hover:border-[#0B305B] focus-within:border-[#0B305B] rounded-2xl px-3 py-2 shadow-xs transition">
+                <GraduationCap className="w-4 h-4 text-[#0B305B] shrink-0" />
+                <span className="text-[11px] font-black uppercase text-slate-500 tracking-wider whitespace-nowrap">
+                  Vista de Programa:
+                </span>
+                <select
+                  value={programaSeleccionado}
+                  onChange={(e) => setProgramaSeleccionado(e.target.value)}
+                  className="bg-transparent text-slate-900 text-xs font-black outline-none cursor-pointer pr-1"
+                >
+                  <option value="todos">🏛️ Consolidado de Facultad</option>
+                  {programas.map((prog) => (
+                    <option key={prog.id} value={prog.nombre}>
+                      📘 {prog.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              Base de Datos Sincronizada
+            </span>
+          </div>
+        </div>
+
+        {/* Tarjetas de Métricas (KPIs) Filtradas en Tiempo Real */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-1">
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="text-[11px] font-bold uppercase">Eventos Totales</span>
+              <Calendar className="w-4 h-4 text-[#0B305B]" />
+            </div>
+            <div className="text-2xl font-black text-slate-900">{eventosFiltrados.length}</div>
+            <div className="text-[10px] text-slate-500">
+              {programaSeleccionado === 'todos' ? 'En toda la facultad' : programaSeleccionado}
+            </div>
+          </div>
+
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-1">
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="text-[11px] font-bold uppercase">Personal y Usuarios</span>
+              <Users className="w-4 h-4 text-[#0B305B]" />
+            </div>
+            <div className="text-2xl font-black text-slate-900">{usuariosPorPrograma.length}</div>
+            <div className="text-[10px] text-slate-500">
+              {programaSeleccionado === 'todos' ? 'Alumnos, profesores y staff' : `Adscritos a ${programaSeleccionado}`}
+            </div>
+          </div>
+
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-1">
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="text-[11px] font-bold uppercase">Inscripciones</span>
+              <GraduationCap className="w-4 h-4 text-blue-600" />
+            </div>
+            <div className="text-2xl font-black text-slate-900">{metricasCalculadas.totalInscripciones}</div>
+            <div className="text-[10px] text-slate-500">
+              {programaSeleccionado === 'todos' ? 'Total registros plataforma' : `Registros en ${programaSeleccionado}`}
+            </div>
+          </div>
+
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-1">
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="text-[11px] font-bold uppercase">Total Recaudado</span>
+              <DollarSign className="w-4 h-4 text-emerald-600" />
+            </div>
+            <div className="text-2xl font-black text-emerald-700">
+              ${metricasCalculadas.totalRecaudado.toLocaleString()}
+            </div>
+            <div className="text-[10px] text-slate-500">
+              {programaSeleccionado === 'todos' ? 'Total consolidado general' : `Recaudo en ${programaSeleccionado}`}
+            </div>
+          </div>
+        </div>
+      </div>
       {/* Alertas de Notificación Flotantes */}
       {mensajeExito && (
         <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl flex items-center gap-3 text-xs font-semibold shadow-sm animate-in fade-in">
@@ -244,7 +432,7 @@ export default function PanelAdminCliente({
           }`}
         >
           <Calendar className="w-4 h-4" />
-          Gestión de Eventos ({eventos.length})
+          Gestión de Eventos ({eventosFiltrados.length})
         </button>
 
         <button
@@ -256,20 +444,22 @@ export default function PanelAdminCliente({
           }`}
         >
           <Users className="w-4 h-4" />
-          Usuarios y Accesos ({usuarios.length})
+          Usuarios y Accesos ({usuariosPorPrograma.length})
         </button>
 
-        <button
-          onClick={() => setTabActiva('plantillas')}
-          className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-            tabActiva === 'plantillas'
-              ? 'bg-[#0B305B] text-white shadow-md shadow-[#0B305B]/20'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-          }`}
-        >
-          <FileText className="w-4 h-4" />
-          Configurar Plantillas PDF
-        </button>
+        {esSuperAdmin && (
+          <button
+            onClick={() => setTabActiva('plantillas')}
+            className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              tabActiva === 'plantillas'
+                ? 'bg-[#0B305B] text-white shadow-md shadow-[#0B305B]/20'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            Configurar Plantillas PDF
+          </button>
+        )}
 
         <Link
           href="/admin/asignaturas"
@@ -309,90 +499,100 @@ export default function PanelAdminCliente({
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {eventos.map((evento) => (
-              <div
-                key={evento.id}
-                className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between"
-              >
-                <div>
-                  {/* Cabecera visual del evento */}
-                  <div className="h-32 bg-slate-100 relative overflow-hidden">
-                    {evento.imagenUrl || evento.logo_fondo_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={evento.imagenUrl || evento.logo_fondo_url || ''}
-                        alt={evento.titulo}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-[#0B305B] flex items-center justify-center text-white/40">
-                        <ImageIcon className="w-10 h-10" />
-                      </div>
-                    )}
-                    <div className="absolute top-2 right-2">
-                      <span
-                        className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full shadow-sm ${
-                          evento.estado === 'PUBLICADO'
-                            ? 'bg-emerald-500 text-white'
-                            : 'bg-amber-500 text-white'
-                        }`}
-                      >
-                        {evento.estado}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="p-4 space-y-2">
-                    <h3 className="font-bold text-slate-900 text-sm leading-snug line-clamp-2">
-                      {evento.titulo}
-                    </h3>
-                    <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
-                      {evento.descripcion}
-                    </p>
-
-                    <div className="pt-2 space-y-1.5 text-xs text-slate-600">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-3.5 h-3.5 text-[#D2202E]" />
-                        <span className="truncate">{evento.ubicacion}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Users className="w-3.5 h-3.5 text-blue-600" />
-                        <span>
-                          {evento._count?.inscripciones || 0} inscritos /{' '}
-                          {evento.capacidadMaxima ? `${evento.capacidadMaxima} cupos` : 'Ilimitado'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
-                        <span className="font-bold text-slate-900">
-                          {evento.precio > 0 ? `$${evento.precio.toLocaleString()} COP` : 'Entrada Gratuita'}
+          {eventosFiltrados.length === 0 ? (
+            <div className="bg-white p-12 text-center rounded-3xl border border-slate-200 text-slate-400 space-y-2 shadow-xs">
+              <Calendar className="w-12 h-12 mx-auto text-slate-300 opacity-60" />
+              <p className="font-bold text-base text-slate-700">No hay eventos para el programa seleccionado</p>
+              <p className="text-xs text-slate-400">
+                Selecciona &quot;Consolidado de Facultad&quot; en el selector superior o crea un nuevo evento para este departamento.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {eventosFiltrados.map((evento) => (
+                <div
+                  key={evento.id}
+                  className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between"
+                >
+                  <div>
+                    {/* Cabecera visual del evento */}
+                    <div className="h-32 bg-slate-100 relative overflow-hidden">
+                      {evento.imagenUrl || evento.logo_fondo_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={evento.imagenUrl || evento.logo_fondo_url || ''}
+                          alt={evento.titulo}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-[#0B305B] flex items-center justify-center text-white/40">
+                          <ImageIcon className="w-10 h-10" />
+                        </div>
+                      )}
+                      <div className="absolute top-2 right-2">
+                        <span
+                          className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full shadow-sm ${
+                            evento.estado === 'PUBLICADO'
+                              ? 'bg-emerald-500 text-white'
+                              : 'bg-amber-500 text-white'
+                          }`}
+                        >
+                          {evento.estado}
                         </span>
                       </div>
                     </div>
+
+                    <div className="p-4 space-y-2">
+                      <h3 className="font-bold text-slate-900 text-sm leading-snug line-clamp-2">
+                        {evento.titulo}
+                      </h3>
+                      <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                        {evento.descripcion}
+                      </p>
+
+                      <div className="pt-2 space-y-1.5 text-xs text-slate-600">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-3.5 h-3.5 text-[#D2202E]" />
+                          <span className="truncate">{evento.ubicacion}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Users className="w-3.5 h-3.5 text-blue-600" />
+                          <span>
+                            {evento._count?.inscripciones || 0} inscritos
+                            {evento.capacidadMaxima ? ` / ${evento.capacidadMaxima} cupos` : ''}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="font-semibold text-emerald-700">
+                            {evento.precio === 0 ? 'Entrada Libre' : `$${evento.precio.toLocaleString()} COP`}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Acciones del Evento */}
+                  <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <Link
+                      href={`/admin/eventos/nuevo?id=${evento.id}`}
+                      className="flex-1 py-1.5 px-3 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Edit2 className="w-3.5 h-3.5 text-[#0B305B]" />
+                      Editar
+                    </Link>
+                    <button
+                      onClick={() => handleEliminarEvento(evento.id, evento.titulo)}
+                      disabled={cargandoAccion}
+                      className="py-1.5 px-3 bg-white hover:bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
-
-                {/* Acciones del Evento */}
-                <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
-                  <Link
-                    href={`/admin/eventos/nuevo?id=${evento.id}`}
-                    className="flex-1 py-1.5 px-3 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <Edit2 className="w-3.5 h-3.5 text-[#0B305B]" />
-                    Editar
-                  </Link>
-                  <button
-                    onClick={() => handleEliminarEvento(evento.id, evento.titulo)}
-                    disabled={cargandoAccion}
-                    className="py-1.5 px-3 bg-white hover:bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -471,7 +671,9 @@ export default function PanelAdminCliente({
                         <td className="py-3 px-4">
                           <span
                             className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-2.5 py-1 rounded-full ${
-                              u.rol === 'ADMIN'
+                              u.rol === 'SUPER_ADMIN'
+                                ? 'bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs'
+                                : u.rol === 'ADMIN'
                                 ? 'bg-purple-100 text-purple-800'
                                 : u.rol === 'PROFESOR'
                                 ? 'bg-blue-100 text-blue-800'
@@ -480,17 +682,22 @@ export default function PanelAdminCliente({
                                 : 'bg-slate-100 text-slate-700'
                             }`}
                           >
-                            {u.rol === 'ADMIN' && <ShieldCheck className="w-3 h-3" />}
+                            {u.rol === 'SUPER_ADMIN' && <ShieldCheck className="w-3 h-3 text-[#D2202E]" />}
+                            {u.rol === 'ADMIN' && <ShieldCheck className="w-3 h-3 text-purple-700" />}
                             {u.rol === 'PROFESOR' && <GraduationCap className="w-3 h-3" />}
                             {u.rol === 'STAFF' && <Briefcase className="w-3 h-3" />}
                             {u.rol === 'ALUMNO' && <User className="w-3 h-3" />}
-                            {u.rol}
+                            {u.rol === 'SUPER_ADMIN' ? 'SUPER ADMIN' : u.rol === 'ADMIN' ? 'JEFE PROGRAMA' : u.rol}
                           </span>
                         </td>
                         <td className="py-3 px-4 text-center">
-                          {esAdminPrincipal ? (
-                            <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-1 rounded">
-                              Super Administrador
+                          {u.rol === 'SUPER_ADMIN' || u.email === 'juannavarro@unisinu.edu.co' ? (
+                            <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
+                              Súper Administrador
+                            </span>
+                          ) : !esSuperAdmin && u.rol === 'ADMIN' ? (
+                            <span className="text-[10px] font-bold text-purple-800 bg-purple-50 border border-purple-200 px-2 py-1 rounded-lg">
+                              Jefe de Programa
                             </span>
                           ) : (
                             <select
@@ -502,9 +709,11 @@ export default function PanelAdminCliente({
                               className="px-2.5 py-1 bg-white border border-slate-200 focus:border-[#0B305B] rounded-lg text-xs font-bold text-slate-700 outline-none cursor-pointer"
                             >
                               <option value="ALUMNO">ALUMNO (Estudiante)</option>
-                              <option value="PROFESOR">PROFESOR (Aprobar Pagos)</option>
+                              <option value="PROFESOR">PROFESOR (Docente)</option>
                               <option value="STAFF">STAFF (Control en Puerta)</option>
-                              <option value="ADMIN">ADMIN (Acceso Total)</option>
+                              {esSuperAdmin && (
+                                <option value="ADMIN">ADMIN (Jefe de Programa)</option>
+                              )}
                             </select>
                           )}
                         </td>
@@ -520,8 +729,8 @@ export default function PanelAdminCliente({
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
 
-                            {/* 2 y 3) Botón Eliminar con Regla de Seguridad para Administrador */}
-                            {esAdminPrincipal || esMismoAdmin ? (
+                            {/* 2 y 3) Botón Eliminar con Regla de Seguridad para Administradores */}
+                            {u.rol === 'SUPER_ADMIN' || (!esSuperAdmin && u.rol === 'ADMIN') || esMismoAdmin ? (
                               <span
                                 title="Cuenta protegida contra eliminación"
                                 className="p-1.5 text-slate-300 cursor-not-allowed inline-flex items-center"
@@ -721,6 +930,89 @@ export default function PanelAdminCliente({
                   </div>
                 </div>
               </div>
+
+              {/* Tarjeta Visual: Textos del Portal Público */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                  <h3 className="font-bold text-xs text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-[#D2202E]" />
+                    Textos del Portal Público
+                  </h3>
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-50 text-[#0B305B] border border-blue-200">
+                    Página Raíz (/)
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-slate-500">
+                  Personaliza los textos informativos principales del banner de bienvenida que los estudiantes ven en el portal público.
+                </p>
+
+                <div className="space-y-4">
+                  {/* 1. Input Corto: titulo_convocatoria */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                      <span>Título de la Convocatoria</span>
+                      <span className="text-[10px] font-mono text-slate-400">titulo_convocatoria</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="titulo_convocatoria"
+                      value={tituloConvocatoriaInput}
+                      onChange={(e) => setTituloConvocatoriaInput(e.target.value)}
+                      required
+                      placeholder="Ej. Convocatoria Académica Abierta"
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-bold text-[#0B305B] outline-none transition"
+                    />
+                    <p className="text-[10px] text-slate-400">
+                      Encabezado destacado que se muestra en el banner superior del portal público.
+                    </p>
+                  </div>
+
+                  {/* 2. Área de Texto (textarea): descripcion_convocatoria */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                      <span>Descripción de la Convocatoria</span>
+                      <span className="text-[10px] font-mono text-slate-400">descripcion_convocatoria</span>
+                    </label>
+                    <textarea
+                      name="descripcion_convocatoria"
+                      value={descripcionConvocatoriaInput}
+                      onChange={(e) => setDescripcionConvocatoriaInput(e.target.value)}
+                      required
+                      rows={3}
+                      placeholder="Explora la oferta académica de la Universidad del Sinú..."
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs leading-relaxed outline-none transition"
+                    />
+                    <p className="text-[10px] text-slate-400">
+                      Párrafo descriptivo que orienta a los alumnos sobre el proceso de inscripción y formación continua.
+                    </p>
+                  </div>
+
+                  {/* Botón de Guardar dentro de la Tarjeta */}
+                  <div className="pt-3 flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-slate-100">
+                    <span className="text-[11px] text-slate-500">
+                      Se actualiza directamente en <code className="font-mono text-[#0B305B] font-bold">ConfiguracionPlantillas</code>
+                    </span>
+                    <button
+                      type="submit"
+                      disabled={cargandoAccion}
+                      className="w-full sm:w-auto px-4 py-2 bg-[#0B305B] hover:bg-[#071F3B] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      {cargandoAccion ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Guardando...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-3.5 h-3.5 text-[#D2202E]" />
+                          Guardar Textos
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* COLUMNA DERECHA: PREVISUALIZACIÓN EN VIVO (5 Columnas) */}
@@ -821,6 +1113,23 @@ export default function PanelAdminCliente({
                     </div>
                   </div>
                 </div>
+
+                {/* Mockup 3: Banner del Portal Público */}
+                <div className="space-y-1.5 pt-3 border-t border-slate-100">
+                  <span className="text-[11px] font-bold text-slate-700">3. Banner del Portal Público (Inicio /):</span>
+                  <div className="p-3 bg-gradient-to-r from-[#0B305B] to-[#041224] text-white rounded-xl border border-slate-300 text-left space-y-1.5">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/10 text-[8px] font-bold text-white">
+                      <Sparkles className="w-2.5 h-2.5 text-[#D2202E]" />
+                      <span className="line-clamp-1">{tituloConvocatoriaInput || 'Convocatoria Académica Abierta'}</span>
+                    </div>
+                    <div className="text-[10px] font-black leading-tight line-clamp-1">
+                      {tituloConvocatoriaInput || 'Convocatoria Académica Abierta'}
+                    </div>
+                    <p className="text-[8px] text-slate-300 line-clamp-2 leading-relaxed">
+                      {descripcionConvocatoriaInput || 'Explora la oferta académica de la Universidad del Sinú...'}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -907,18 +1216,45 @@ export default function PanelAdminCliente({
                   >
                     <option value="PROFESOR">PROFESOR (Aprobar pagos en efectivo)</option>
                     <option value="STAFF">STAFF (Control de asistencia en puerta)</option>
+                    {esSuperAdmin && (
+                      <option value="ADMIN">ADMIN (Jefe de Programa / Departamento)</option>
+                    )}
                   </select>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="font-bold text-slate-700">Facultad / Carrera</label>
-                  <input
-                    type="text"
-                    name="carrera"
-                    defaultValue="Facultad de Ingenierías"
-                    placeholder="Ej. Ingeniería de Sistemas"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none"
-                  />
+                  <label className="font-bold text-slate-700">Programa Académico *</label>
+                  {esSuperAdmin && programas && programas.length > 0 ? (
+                    <select
+                      name="carrera"
+                      defaultValue={programas[0]?.nombre || 'Ingeniería de Sistemas'}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none font-bold text-slate-800 cursor-pointer"
+                    >
+                      {programas.map((p) => (
+                        <option key={p.id} value={p.nombre}>
+                          {p.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      name="carrera"
+                      defaultValue={adminActual.carrera || 'Facultad de Ingenierías'}
+                      readOnly={!esSuperAdmin && !!adminActual.carrera}
+                      placeholder="Ej. Ingeniería de Sistemas"
+                      className={`w-full px-3 py-2 border rounded-xl outline-none ${
+                        !esSuperAdmin && !!adminActual.carrera
+                          ? 'bg-slate-100 border-slate-200 text-slate-600 cursor-not-allowed font-medium'
+                          : 'bg-slate-50 border-slate-200 focus:border-[#0B305B] focus:bg-white'
+                      }`}
+                    />
+                  )}
+                  {!esSuperAdmin && (
+                    <span className="text-[10px] text-slate-400">
+                      Asignado automáticamente a tu programa académico
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -1035,13 +1371,27 @@ export default function PanelAdminCliente({
 
               <div className="space-y-1">
                 <label className="font-bold text-slate-700">Programa Académico / Facultad</label>
-                <input
-                  type="text"
-                  name="carrera"
-                  defaultValue={usuarioEnEdicion.carrera || 'Facultad de Ingenierías'}
-                  placeholder="Ej. Ingeniería de Sistemas, Ingeniería Industrial..."
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none"
-                />
+                {programas && programas.length > 0 ? (
+                  <select
+                    name="carrera"
+                    defaultValue={usuarioEnEdicion.carrera || programas[0]?.nombre}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none font-bold text-slate-800 cursor-pointer"
+                  >
+                    {programas.map((p) => (
+                      <option key={p.id} value={p.nombre}>
+                        {p.nombre}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    name="carrera"
+                    defaultValue={usuarioEnEdicion.carrera || 'Facultad de Ingenierías'}
+                    placeholder="Ej. Ingeniería de Sistemas, Ingeniería Industrial..."
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none"
+                  />
+                )}
               </div>
 
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between text-[11px]">

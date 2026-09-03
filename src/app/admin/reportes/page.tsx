@@ -7,22 +7,34 @@ import DashboardReportesCliente from '@/components/admin/reportes/DashboardRepor
 import BotonCerrarSesion from '@/components/auth/BotonCerrarSesion'
 import { ShieldCheck, ArrowLeft, BarChart3, TrendingUp } from 'lucide-react'
 
+import {
+  esSuperAdmin,
+  esAdminOSuperior,
+  filtroEventosPorTenancy,
+  filtroInscripcionesPorTenancy,
+} from '@/lib/auth/multitenancy'
+
 export const dynamic = 'force-dynamic'
 
 export default async function ReportesPage() {
   const session = await getAuthSession()
 
-  // Protección en el servidor: Exclusivo para rol ADMIN
-  if (!session || session.rol !== 'ADMIN') {
+  // Protección en el servidor: SUPER_ADMIN o ADMIN de Programa
+  if (!session || !esAdminOSuperior(session)) {
     redirect('/login?error=acceso_denegado_admin')
   }
 
-  // Consulta de datos de eventos, inscripciones y asistencias
-  const [eventos, inscripciones] = await Promise.all([
+  const filtroEventos = filtroEventosPorTenancy(session)
+  const filtroInscripciones = filtroInscripcionesPorTenancy(session)
+
+  // Consulta de datos de eventos, inscripciones y asistencias con aislamiento Multi-Tenancy
+  const [eventos, inscripciones, programas] = await Promise.all([
     prisma.evento.findMany({
+      where: filtroEventos,
       orderBy: { fechaInicio: 'desc' },
     }),
     prisma.inscripcion.findMany({
+      where: filtroInscripciones,
       include: {
         usuario: true,
         evento: true,
@@ -34,6 +46,11 @@ export default async function ReportesPage() {
         },
       },
       orderBy: { fechaInscripcion: 'desc' },
+    }),
+    prisma.programa.findMany({
+      where: { estado_activo: true },
+      select: { id: true, nombre: true },
+      orderBy: { nombre: 'asc' },
     }),
   ])
 
@@ -92,7 +109,7 @@ export default async function ReportesPage() {
                   UNISINÚ
                 </span>
                 <span className="text-[10px] tracking-wider text-slate-300 font-bold uppercase">
-                  Auditoría Financiera &amp; Académica
+                  {esSuperAdmin(session) ? 'Auditoría Global de Facultad' : `Auditoría • ${session.carrera || 'Programa'}`}
                 </span>
               </div>
               <h1 className="text-sm sm:text-base font-bold text-white tracking-tight">
@@ -150,6 +167,8 @@ export default async function ReportesPage() {
         <DashboardReportesCliente
           eventos={eventosMapeados}
           inscripciones={inscripcionesMapeadas}
+          programas={programas}
+          esSuperAdmin={esSuperAdmin(session)}
         />
       </main>
     </div>

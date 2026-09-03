@@ -74,7 +74,11 @@ export async function verificarPermiso(rolesPermitidos: RolUsuario[]): Promise<A
   const session = await getAuthSession()
   if (!session) return null
 
-  if (rolesPermitidos.includes(session.rol) || session.rol === RolUsuario.ADMIN) {
+  if (
+    rolesPermitidos.includes(session.rol) ||
+    session.rol === RolUsuario.SUPER_ADMIN ||
+    session.rol === RolUsuario.ADMIN
+  ) {
     return session
   }
 

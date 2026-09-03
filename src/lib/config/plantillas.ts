@@ -9,6 +9,8 @@ export interface ConfiguracionPlantillasData {
   cargo_firmante: string
   color_primario: string
   color_secundario: string
+  titulo_convocatoria: string
+  descripcion_convocatoria: string
   updatedAt?: Date
 }
 
@@ -20,6 +22,9 @@ export const CONFIG_PLANTILLAS_DEFAULT: ConfiguracionPlantillasData = {
   cargo_firmante: 'Decano Facultad de Ciencias e Ingenierías',
   color_primario: '#0B305B',
   color_secundario: '#D2202E',
+  titulo_convocatoria: 'Convocatoria Académica Abierta',
+  descripcion_convocatoria:
+    'Explora la oferta académica de la Universidad del Sinú. Inscríbete con tu número de documento, asegura tu cupo y expande tus conocimientos en nuestros espacios de formación continua.',
 }
 
 /**
@@ -41,6 +46,8 @@ export async function obtenerConfiguracionPlantillas(): Promise<ConfiguracionPla
           cargo_firmante: CONFIG_PLANTILLAS_DEFAULT.cargo_firmante,
           color_primario: CONFIG_PLANTILLAS_DEFAULT.color_primario,
           color_secundario: CONFIG_PLANTILLAS_DEFAULT.color_secundario,
+          titulo_convocatoria: CONFIG_PLANTILLAS_DEFAULT.titulo_convocatoria,
+          descripcion_convocatoria: CONFIG_PLANTILLAS_DEFAULT.descripcion_convocatoria,
         },
       })
     }

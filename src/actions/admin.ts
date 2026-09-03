@@ -14,31 +14,76 @@ export interface ActionResult {
 }
 
 /**
- * Valida que la sesión actual pertenezca a un usuario con rol ADMIN
+ * Valida que la sesión actual pertenezca a un usuario con rol SUPER_ADMIN o ADMIN
  */
-async function asegurarAdmin(): Promise<void> {
+async function asegurarAdmin() {
   const session = await getAuthSession()
-  if (!session || session.rol !== 'ADMIN') {
-    throw new Error('Acceso no autorizado: Se requieren privilegios de Administrador General.')
+  if (!session || (session.rol !== RolUsuario.SUPER_ADMIN && session.rol !== RolUsuario.ADMIN)) {
+    throw new Error('Acceso no autorizado: Se requieren privilegios de Administrador.')
   }
+  return session
 }
 
 /**
- * Cambia el rol de un usuario (para asignar o revocar accesos a PROFESOR, STAFF, ALUMNO)
+ * Valida que la sesión actual pertenezca exclusivamente a un SUPER_ADMIN
+ */
+async function asegurarSuperAdmin() {
+  const session = await getAuthSession()
+  if (!session || session.rol !== RolUsuario.SUPER_ADMIN) {
+    throw new Error('Acceso no autorizado: Esta acción es exclusiva del Súper Administrador.')
+  }
+  return session
+}
+
+/**
+ * Cambia el rol de un usuario (para asignar o revocar accesos)
  */
 export async function cambiarRolUsuario(
   usuarioId: string,
   nuevoRol: RolUsuario
 ): Promise<ActionResult> {
   try {
-    await asegurarAdmin()
+    const session = await asegurarAdmin()
 
-    // Evitar que el administrador se quite a sí mismo el rol ADMIN
-    const session = await getAuthSession()
-    if (session?.id === usuarioId && nuevoRol !== 'ADMIN') {
+    // Regla de Seguridad: Solo SUPER_ADMIN puede crear o asignar ADMIN o SUPER_ADMIN
+    if (
+      (nuevoRol === RolUsuario.ADMIN || nuevoRol === RolUsuario.SUPER_ADMIN) &&
+      session.rol !== RolUsuario.SUPER_ADMIN
+    ) {
       return {
         success: false,
-        error: 'Por seguridad, el Administrador principal no puede revocar sus propios privilegios.',
+        error: 'Privilegios insuficientes: Solo el Súper Administrador puede nombrar o promover administradores.',
+      }
+    }
+
+    // Un ADMIN de programa no puede modificar a usuarios fuera de su carrera ni a otros administradores
+    if (session.rol !== RolUsuario.SUPER_ADMIN && session.carrera) {
+      const targetUser = await prisma.usuario.findUnique({ where: { id: usuarioId } })
+      if (
+        targetUser?.carrera &&
+        !targetUser.carrera.toLowerCase().includes(session.carrera.toLowerCase())
+      ) {
+        return {
+          success: false,
+          error: `No tienes permisos para modificar usuarios fuera de tu programa académico (${session.carrera}).`,
+        }
+      }
+      if (
+        targetUser &&
+        (targetUser.rol === RolUsuario.ADMIN || targetUser.rol === RolUsuario.SUPER_ADMIN)
+      ) {
+        return {
+          success: false,
+          error: 'No puedes modificar los privilegios de otros administradores.',
+        }
+      }
+    }
+
+    // Evitar que el usuario se quite a sí mismo sus privilegios
+    if (session.id === usuarioId && nuevoRol !== session.rol) {
+      return {
+        success: false,
+        error: 'Por seguridad, no puedes revocar tus propios privilegios.',
       }
     }
 
@@ -69,8 +114,7 @@ export async function cambiarRolUsuario(
  */
 export async function crearEvento(formData: FormData): Promise<ActionResult> {
   try {
-    await asegurarAdmin()
-    const session = await getAuthSession()
+    const session = await asegurarAdmin()
 
     const titulo = formData.get('titulo') as string
     const descripcion = formData.get('descripcion') as string
@@ -117,6 +161,12 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
       }
     }
 
+    let programaAcademico =
+      (formData.get('programa_academico') as string)?.trim() || 'Facultad de Ingenierías'
+    if (session.rol !== RolUsuario.SUPER_ADMIN && session.carrera) {
+      programaAcademico = session.carrera
+    }
+
     await prisma.evento.create({
       data: {
         titulo,
@@ -132,6 +182,7 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
         logo_universidad_url: '/imagen_2.png',
         imagen_central_url: imagenCentralUrl,
         sponsors_url: sponsorsUrl,
+        programa_academico: programaAcademico,
         organizadorId: session?.id || '',
       },
     })
@@ -155,7 +206,7 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
  */
 export async function actualizarEvento(formData: FormData): Promise<ActionResult> {
   try {
-    await asegurarAdmin()
+    const session = await asegurarAdmin()
 
     const eventoId = formData.get('eventoId') as string
     const titulo = formData.get('titulo') as string
@@ -174,6 +225,24 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
 
     if (!eventoId || !titulo || !descripcion) {
       return { success: false, error: 'Identificador o campos obligatorios faltantes.' }
+    }
+
+    // Validar aislamiento: ADMIN de programa solo puede editar eventos de su propio programa
+    if (session.rol !== RolUsuario.SUPER_ADMIN && session.carrera) {
+      const eventoActual = await prisma.evento.findUnique({
+        where: { id: eventoId },
+        select: { programa_academico: true, organizador: { select: { carrera: true } } },
+      })
+      if (
+        eventoActual &&
+        eventoActual.programa_academico !== session.carrera &&
+        !eventoActual.organizador?.carrera?.toLowerCase().includes(session.carrera.toLowerCase())
+      ) {
+        return {
+          success: false,
+          error: `No tienes permisos para modificar eventos fuera de tu programa académico (${session.carrera}).`,
+        }
+      }
     }
 
     // 1. Procesar archivo de Imagen Central si fue subido
@@ -240,7 +309,25 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
  */
 export async function eliminarEvento(eventoId: string): Promise<ActionResult> {
   try {
-    await asegurarAdmin()
+    const session = await asegurarAdmin()
+
+    // Validar aislamiento: ADMIN de programa solo puede eliminar eventos de su propio programa
+    if (session.rol !== RolUsuario.SUPER_ADMIN && session.carrera) {
+      const eventoActual = await prisma.evento.findUnique({
+        where: { id: eventoId },
+        select: { programa_academico: true, organizador: { select: { carrera: true } } },
+      })
+      if (
+        eventoActual &&
+        eventoActual.programa_academico !== session.carrera &&
+        !eventoActual.organizador?.carrera?.toLowerCase().includes(session.carrera.toLowerCase())
+      ) {
+        return {
+          success: false,
+          error: `No tienes permisos para eliminar eventos fuera de tu programa académico (${session.carrera}).`,
+        }
+      }
+    }
 
     await prisma.evento.delete({
       where: { id: eventoId },
@@ -265,12 +352,12 @@ export async function eliminarEvento(eventoId: string): Promise<ActionResult> {
  */
 export async function registrarPersonal(formData: FormData): Promise<ActionResult> {
   try {
-    await asegurarAdmin()
+    const session = await asegurarAdmin()
 
     const nombre = (formData.get('nombre') as string)?.trim()
     const email = (formData.get('email') as string)?.trim().toLowerCase()
     const cedula = (formData.get('cedula') as string)?.trim()
-    const carrera = (formData.get('carrera') as string)?.trim() || 'Facultad de Ingenierías'
+    let carrera = (formData.get('carrera') as string)?.trim() || 'Facultad de Ingenierías'
     const rol = formData.get('rol') as RolUsuario
     const password = (formData.get('password') as string)?.trim()
 
@@ -282,12 +369,24 @@ export async function registrarPersonal(formData: FormData): Promise<ActionResul
       }
     }
 
-    // Regla estricta: Excluir rol ALUMNO y permitir exclusivamente PROFESOR o STAFF
-    if (rol !== RolUsuario.PROFESOR && rol !== RolUsuario.STAFF) {
+    // Regla de Roles: Solo SUPER_ADMIN puede crear ADMIN.
+    if (rol === RolUsuario.ADMIN && session.rol !== RolUsuario.SUPER_ADMIN) {
       return {
         success: false,
-        error: 'Solo se permite registrar personal docente (PROFESOR) o administrativo (STAFF).',
+        error: 'Privilegios insuficientes: Solo el Súper Administrador puede registrar Administradores de Programa.',
       }
+    }
+
+    if (rol === RolUsuario.SUPER_ADMIN || rol === RolUsuario.ALUMNO) {
+      return {
+        success: false,
+        error: 'Rol no permitido para registro manual desde este formulario.',
+      }
+    }
+
+    // Si es ADMIN de programa, se garantiza que el nuevo personal pertenezca a su carrera
+    if (session.rol !== RolUsuario.SUPER_ADMIN && session.carrera) {
+      carrera = session.carrera
     }
 
     // Verificar si el correo ya está registrado
@@ -353,7 +452,7 @@ export async function registrarPersonal(formData: FormData): Promise<ActionResul
  */
 export async function actualizarConfiguracionPlantillas(formData: FormData): Promise<ActionResult> {
   try {
-    await asegurarAdmin()
+    await asegurarSuperAdmin()
 
     let logoUrl = (formData.get('logo_url') as string)?.trim() || '/imagen_2.png'
     let firmaDecanoUrl = (formData.get('firma_decano_url') as string)?.trim() || null
@@ -361,6 +460,12 @@ export async function actualizarConfiguracionPlantillas(formData: FormData): Pro
     const cargoFirmante = (formData.get('cargo_firmante') as string)?.trim() || 'Decano Facultad de Ciencias e Ingenierías'
     const colorPrimario = (formData.get('color_primario') as string)?.trim() || '#0B305B'
     const colorSecundario = (formData.get('color_secundario') as string)?.trim() || '#D2202E'
+
+    const tituloConvocatoria =
+      (formData.get('titulo_convocatoria') as string)?.trim() || 'Convocatoria Académica Abierta'
+    const descripcionConvocatoria =
+      (formData.get('descripcion_convocatoria') as string)?.trim() ||
+      'Explora la oferta académica de la Universidad del Sinú. Inscríbete con tu número de documento, asegura tu cupo y expande tus conocimientos en nuestros espacios de formación continua.'
 
     // 1. Procesar archivo de logo si fue subido
     const archivoLogo = formData.get('archivo_logo') as File | null
@@ -390,6 +495,8 @@ export async function actualizarConfiguracionPlantillas(formData: FormData): Pro
         cargo_firmante: cargoFirmante,
         color_primario: colorPrimario,
         color_secundario: colorSecundario,
+        titulo_convocatoria: tituloConvocatoria,
+        descripcion_convocatoria: descripcionConvocatoria,
       },
       update: {
         logo_url: logoUrl,
@@ -398,6 +505,8 @@ export async function actualizarConfiguracionPlantillas(formData: FormData): Pro
         cargo_firmante: cargoFirmante,
         color_primario: colorPrimario,
         color_secundario: colorSecundario,
+        titulo_convocatoria: tituloConvocatoria,
+        descripcion_convocatoria: descripcionConvocatoria,
       },
     })
 
@@ -493,11 +602,10 @@ export async function actualizarUsuario(formData: FormData): Promise<ActionResul
  */
 export async function eliminarUsuario(usuarioId: string): Promise<ActionResult> {
   try {
-    await asegurarAdmin()
-    const session = await getAuthSession()
+    const session = await asegurarAdmin()
 
     // 1. Regla de seguridad: Evitar autoborrado accidental del usuario autenticado
-    if (session?.id === usuarioId) {
+    if (session.id === usuarioId) {
       return {
         success: false,
         error: 'Operación no permitida: No puedes eliminar tu propia cuenta de Administrador mientras estás en sesión.',
@@ -516,10 +624,26 @@ export async function eliminarUsuario(usuarioId: string): Promise<ActionResult> 
     }
 
     // 2. Proteger al Super Administrador institucional oficial
-    if (usuario.email === 'juannavarro@unisinu.edu.co') {
+    if (usuario.email === 'juannavarro@unisinu.edu.co' || usuario.rol === RolUsuario.SUPER_ADMIN) {
       return {
         success: false,
-        error: 'La cuenta principal de Super Administrador (Juan Carlos Navarro Ramos) está protegida contra eliminación.',
+        error: 'La cuenta de Súper Administrador está protegida contra eliminación.',
+      }
+    }
+
+    // 3. Regla Multi-Tenancy: ADMIN de programa solo puede eliminar usuarios de su propio programa
+    if (session.rol !== RolUsuario.SUPER_ADMIN) {
+      if (usuario.rol === RolUsuario.ADMIN) {
+        return {
+          success: false,
+          error: 'Privilegios insuficientes: Solo el Súper Administrador puede eliminar Administradores de Programa.',
+        }
+      }
+      if (usuario.carrera && session.carrera && !usuario.carrera.toLowerCase().includes(session.carrera.toLowerCase())) {
+        return {
+          success: false,
+          error: `No tienes permisos para eliminar usuarios de otro programa académico (${usuario.carrera}).`,
+        }
       }
     }
 

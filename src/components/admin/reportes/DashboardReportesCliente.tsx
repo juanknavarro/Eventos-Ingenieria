@@ -73,6 +73,8 @@ export interface InscripcionReporte {
 interface Props {
   eventos: EventoOpcion[]
   inscripciones: InscripcionReporte[]
+  programas?: { id: string; nombre: string }[]
+  esSuperAdmin?: boolean
 }
 
 const PALETA_COLORES = [
@@ -86,21 +88,49 @@ const PALETA_COLORES = [
   '#64748B', // Pizarra
 ]
 
-export default function DashboardReportesCliente({ eventos, inscripciones }: Props) {
+export default function DashboardReportesCliente({
+  eventos,
+  inscripciones,
+  programas = [],
+  esSuperAdmin = false,
+}: Props) {
   const [mounted, setMounted] = useState(false)
   const [eventoFiltro, setEventoFiltro] = useState<string>('todos')
+  const [programaFiltro, setProgramaFiltro] = useState<string>('todos')
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // Filtrado de inscripciones según el evento seleccionado
+  // Filtrado de inscripciones según programa y evento seleccionado
   const inscripcionesFiltradas = useMemo(() => {
-    if (eventoFiltro === 'todos') {
-      return inscripciones
+    let list = inscripciones
+    if (programaFiltro !== 'todos') {
+      list = list.filter((ins) =>
+        ins.usuarioCarrera?.toLowerCase().includes(programaFiltro.toLowerCase()) ||
+        ins.eventoTitulo?.toLowerCase().includes(programaFiltro.toLowerCase())
+      )
     }
-    return inscripciones.filter((ins) => ins.eventoId === eventoFiltro)
-  }, [eventoFiltro, inscripciones])
+    if (eventoFiltro !== 'todos') {
+      list = list.filter((ins) => ins.eventoId === eventoFiltro)
+    }
+    return list
+  }, [eventoFiltro, programaFiltro, inscripciones])
+
+  // Filtrar eventos disponibles según programa
+  const eventosDisponibles = useMemo(() => {
+    if (programaFiltro === 'todos') return eventos
+    const idsConInscripciones = new Set(
+      inscripciones
+        .filter((i) => i.usuarioCarrera?.toLowerCase().includes(programaFiltro.toLowerCase()))
+        .map((i) => i.eventoId)
+    )
+    return eventos.filter(
+      (e) =>
+        e.titulo.toLowerCase().includes(programaFiltro.toLowerCase()) ||
+        idsConInscripciones.has(e.id)
+    )
+  }, [eventos, inscripciones, programaFiltro])
 
   // Cálculo dinámico de KPIs
   const kpis = useMemo(() => {
@@ -276,25 +306,52 @@ export default function DashboardReportesCliente({ eventos, inscripciones }: Pro
       {/* BARRA DE CONTROL: FILTRO DE EVENTO Y BOTONES DE EXPORTACIÓN */}
       {/* ========================================================================= */}
       <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-        {/* Selector de Evento */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto">
-          <div className="flex items-center gap-2 text-xs font-bold text-[#0B305B] shrink-0">
-            <Filter className="w-4 h-4 text-[#D2202E]" />
-            Filtrar por Evento:
-          </div>
+        {/* Selectores de Filtro: Programa (SUPER_ADMIN) y Evento */}
+        <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3 w-full lg:w-auto">
+          {esSuperAdmin && programas && programas.length > 0 && (
+            <div className="flex items-center gap-2 bg-slate-50 border-2 border-slate-200 hover:border-[#0B305B] focus-within:border-[#0B305B] rounded-2xl px-3 py-1.5 shadow-xs transition">
+              <GraduationCap className="w-4 h-4 text-[#0B305B] shrink-0" />
+              <span className="text-[11px] font-black uppercase text-slate-500 tracking-wider whitespace-nowrap">
+                Vista de Programa:
+              </span>
+              <select
+                value={programaFiltro}
+                onChange={(e) => {
+                  setProgramaFiltro(e.target.value)
+                  setEventoFiltro('todos')
+                }}
+                className="bg-transparent text-slate-900 text-xs font-black outline-none cursor-pointer pr-1"
+              >
+                <option value="todos">🏛️ Consolidado de Facultad</option>
+                {programas.map((p) => (
+                  <option key={p.id} value={p.nombre}>
+                    📘 {p.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
-          <select
-            value={eventoFiltro}
-            onChange={(e) => setEventoFiltro(e.target.value)}
-            className="w-full sm:w-80 px-3.5 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-bold text-slate-800 outline-none transition cursor-pointer"
-          >
-            <option value="todos">Todos los Eventos Académicos ({eventos.length})</option>
-            {eventos.map((ev) => (
-              <option key={ev.id} value={ev.id}>
-                {ev.titulo} ({ev.estado})
-              </option>
-            ))}
-          </select>
+          {/* Selector de Evento */}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-[#0B305B] shrink-0">
+              <Filter className="w-4 h-4 text-[#D2202E]" />
+              Filtrar por Evento:
+            </div>
+
+            <select
+              value={eventoFiltro}
+              onChange={(e) => setEventoFiltro(e.target.value)}
+              className="w-full sm:w-72 px-3.5 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-bold text-slate-800 outline-none transition cursor-pointer"
+            >
+              <option value="todos">Todos los Eventos ({eventosDisponibles.length})</option>
+              {eventosDisponibles.map((ev) => (
+                <option key={ev.id} value={ev.id}>
+                  {ev.titulo} ({ev.estado})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* 2 y 3) Botones de Exportación: Excel y PDF */}

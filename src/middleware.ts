@@ -39,18 +39,18 @@ export function middleware(request: NextRequest) {
 
   const rol = sessionData.rol
 
-  // 4. Regla estricta para /admin: ÚNICAMENTE rol 'ADMIN'
+  // 4. Regla para /admin: SUPER_ADMIN o ADMIN (Jefe de Programa)
   if (esRutaAdmin) {
-    if (rol !== 'ADMIN') {
+    if (rol !== 'ADMIN' && rol !== 'SUPER_ADMIN') {
       const errorUrl = new URL('/login', request.url)
       errorUrl.searchParams.set('error', 'acceso_denegado_admin')
       return NextResponse.redirect(errorUrl)
     }
   }
 
-  // 5. Regla estricta para /profesor: Solo rol 'PROFESOR' o 'ADMIN'
+  // 5. Regla para /profesor: 'PROFESOR', 'ADMIN' o 'SUPER_ADMIN'
   if (esRutaProfesor) {
-    const tieneAcceso = rol === 'PROFESOR' || rol === 'ADMIN'
+    const tieneAcceso = rol === 'PROFESOR' || rol === 'ADMIN' || rol === 'SUPER_ADMIN'
     if (!tieneAcceso) {
       const errorUrl = new URL('/login', request.url)
       errorUrl.searchParams.set('error', 'acceso_denegado_profesor')
@@ -58,9 +58,9 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // 6. Regla estricta para /staff: Solo rol 'STAFF' o 'ADMIN'
+  // 6. Regla para /staff: 'STAFF', 'ADMIN', 'PROFESOR' o 'SUPER_ADMIN'
   if (esRutaStaff) {
-    const tieneAcceso = rol === 'STAFF' || rol === 'ADMIN'
+    const tieneAcceso = rol === 'STAFF' || rol === 'ADMIN' || rol === 'PROFESOR' || rol === 'SUPER_ADMIN'
     if (!tieneAcceso) {
       const errorUrl = new URL('/login', request.url)
       errorUrl.searchParams.set('error', 'acceso_denegado_staff')

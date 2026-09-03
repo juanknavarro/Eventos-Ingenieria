@@ -17,6 +17,7 @@ import {
   Clock,
   Sparkles,
   Info,
+  GraduationCap,
 } from 'lucide-react'
 import { EstadoEvento } from '@prisma/client'
 import { crearEvento, actualizarEvento } from '@/actions/admin'
@@ -36,13 +37,22 @@ interface EventoInicial {
   logo_fondo_url: string | null
   imagen_central_url: string | null
   sponsors_url: string | null
+  programa_academico?: string | null
 }
 
 interface Props {
   eventoInicial?: EventoInicial | null
+  programaUsuario?: string | null
+  esSuperAdmin?: boolean
+  programas?: { id: string; nombre: string }[]
 }
 
-export default function FormularioEventoCliente({ eventoInicial }: Props) {
+export default function FormularioEventoCliente({
+  eventoInicial,
+  programaUsuario,
+  esSuperAdmin = false,
+  programas = [],
+}: Props) {
   const router = useRouter()
   const esEdicion = !!eventoInicial
 
@@ -240,6 +250,51 @@ export default function FormularioEventoCliente({ eventoInicial }: Props) {
                   Límite de alumnos admitidos para preinscripción.
                 </span>
               </div>
+            </div>
+
+            {/* Programa Académico (Multi-Tenancy) */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <GraduationCap className="w-3.5 h-3.5 text-[#0B305B]" />
+                Programa Académico Asignado *
+              </label>
+              {esSuperAdmin ? (
+                <select
+                  name="programa_academico"
+                  defaultValue={eventoInicial?.programa_academico || 'Facultad de Ingenierías'}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-bold text-slate-800 outline-none transition cursor-pointer"
+                >
+                  <option value="Facultad de Ingenierías">Facultad de Ingenierías (General / Todas)</option>
+                  {programas && programas.length > 0 ? (
+                    programas.map((p) => (
+                      <option key={p.id} value={p.nombre}>
+                        {p.nombre}
+                      </option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="Ingeniería de Sistemas">Ingeniería de Sistemas</option>
+                      <option value="Ingeniería Industrial">Ingeniería Industrial</option>
+                      <option value="Ingeniería Civil">Ingeniería Civil</option>
+                      <option value="Ingeniería Electromecánica">Ingeniería Electromecánica</option>
+                      <option value="Ingeniería de Software y Tecnologías Emergentes">Ingeniería de Software y Tecnologías Emergentes</option>
+                    </>
+                  )}
+                </select>
+              ) : (
+                <div>
+                  <input
+                    type="text"
+                    name="programa_academico"
+                    defaultValue={eventoInicial?.programa_academico || programaUsuario || 'Facultad de Ingenierías'}
+                    readOnly
+                    className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none cursor-not-allowed"
+                  />
+                  <span className="text-[10px] text-slate-400">
+                    Asignado a tu programa académico ({programaUsuario || 'Departamento'})
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Estado del Evento */}

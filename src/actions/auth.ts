@@ -78,7 +78,7 @@ export async function iniciarSesionConCredenciales(
     // Determinar ruta de redirección según el rol del usuario
     let destino = redirectParam || '/'
     if (!redirectParam || redirectParam === '/') {
-      if (usuario.rol === 'ADMIN') destino = '/admin'
+      if (usuario.rol === 'SUPER_ADMIN' || usuario.rol === 'ADMIN') destino = '/admin'
       else if (usuario.rol === 'PROFESOR') destino = '/profesor'
       else if (usuario.rol === 'STAFF') destino = '/staff/asistencia'
       else destino = '/certificados'

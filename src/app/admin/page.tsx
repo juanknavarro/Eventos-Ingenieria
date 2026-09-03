@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import { redirect } from 'next/navigation'
 import prisma from '@/lib/prisma'
 import { getAuthSession } from '@/lib/auth/session'
@@ -7,30 +7,39 @@ import BotonCerrarSesion from '@/components/auth/BotonCerrarSesion'
 import Link from 'next/link'
 import {
   ShieldCheck,
-  Calendar,
-  Users,
-  DollarSign,
   GraduationCap,
   Award,
-  ArrowUpRight,
   ExternalLink,
+  Building2,
 } from 'lucide-react'
 
 import { obtenerConfiguracionPlantillas } from '@/lib/config/plantillas'
+import {
+  esSuperAdmin,
+  esAdminOSuperior,
+  filtroEventosPorTenancy,
+  filtroUsuariosPorTenancy,
+  filtroInscripcionesPorTenancy,
+} from '@/lib/auth/multitenancy'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminPage() {
   const session = await getAuthSession()
 
-  // Protección del lado del servidor: Estrictamente para rol ADMIN
-  if (!session || session.rol !== 'ADMIN') {
+  // Protección del lado del servidor: Estrictamente para SUPER_ADMIN o ADMIN de Programa
+  if (!session || !esAdminOSuperior(session)) {
     redirect('/login?error=acceso_denegado_admin')
   }
 
-  // Cargar datos del sistema
-  const [eventos, usuarios, totalInscripciones, pagosCompletados, configPlantillas] = await Promise.all([
+  const filtroEventos = filtroEventosPorTenancy(session)
+  const filtroUsuarios = filtroUsuariosPorTenancy(session)
+  const filtroInscripciones = filtroInscripcionesPorTenancy(session)
+
+  // Cargar datos del sistema con aislamiento Multi-Tenancy y Programas oficiales
+  const [eventos, usuarios, inscripcionesRaw, pagosCompletados, configPlantillas, programas] = await Promise.all([
     prisma.evento.findMany({
+      where: filtroEventos,
       orderBy: { fechaInicio: 'desc' },
       include: {
         _count: {
@@ -39,20 +48,61 @@ export default async function AdminPage() {
       },
     }),
     prisma.usuario.findMany({
+      where: filtroUsuarios,
       orderBy: { nombre: 'asc' },
     }),
-    prisma.inscripcion.count(),
+    prisma.inscripcion.findMany({
+      where: filtroInscripciones,
+      select: {
+        id: true,
+        eventoId: true,
+        usuarioId: true,
+        estado_pago: true,
+        montoPagado: true,
+        usuario: {
+          select: {
+            carrera: true,
+            programaId: true,
+          },
+        },
+        evento: {
+          select: {
+            programa_academico: true,
+            programaId: true,
+          },
+        },
+      },
+    }),
     prisma.inscripcion.aggregate({
-      where: { estado_pago: 'PAGADO' },
+      where: {
+        ...filtroInscripciones,
+        estado_pago: 'PAGADO',
+      },
       _sum: { montoPagado: true },
     }),
     obtenerConfiguracionPlantillas(),
+    prisma.programa.findMany({
+      where: { estado_activo: true },
+      select: { id: true, nombre: true },
+      orderBy: { nombre: 'asc' },
+    }),
   ])
 
+  const totalInscripciones = inscripcionesRaw.length
   const totalRecaudado = pagosCompletados._sum.montoPagado || 0
 
+  const inscripcionesMapeadas = inscripcionesRaw.map((i) => ({
+    id: i.id,
+    eventoId: i.eventoId,
+    usuarioId: i.usuarioId,
+    estado_pago: i.estado_pago,
+    montoPagado: i.montoPagado,
+    carreraUsuario: i.usuario?.carrera || null,
+    programaEvento: i.evento?.programa_academico || null,
+  }))
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-slate-50 text-slate-900 pb-16">
       {/* Header Institucional Corporativo */}
       <header className="bg-[#0B305B] text-white border-b-4 border-[#D2202E] sticky top-0 z-40 shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -76,6 +126,16 @@ export default async function AdminPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            {esSuperAdmin(session) && (
+              <Link
+                href="/admin/programas"
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#D2202E] hover:bg-[#B01824] text-white transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                Gestionar Programas
+              </Link>
+            )}
+
             <Link
               href="/profesor"
               className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 hover:bg-white/20 text-white transition flex items-center gap-1.5"
@@ -109,79 +169,8 @@ export default async function AdminPage() {
       </header>
 
       {/* Contenido Principal */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Banner de Bienvenida y KPIs Globales */}
-        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-extrabold text-[#D2202E]">
-                  SUPER ADMINISTRADOR
-                </span>
-                <span className="text-slate-400">&bull;</span>
-                <span className="text-xs text-slate-500 font-medium">
-                  {session.email}
-                </span>
-              </div>
-              <h2 className="text-xl font-extrabold text-[#0B305B] tracking-tight mt-0.5">
-                Bienvenido, {session.nombre}
-              </h2>
-              <p className="text-xs text-slate-500 mt-1">
-                Control centralizado de eventos, asignación de roles a docentes/staff y personalización de documentos oficiales.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                Base de Datos Sincronizada (Supabase)
-              </span>
-            </div>
-          </div>
-
-          {/* Tarjetas de Métricas Globales */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-1">
-              <div className="flex items-center justify-between text-slate-400">
-                <span className="text-[11px] font-bold uppercase">Eventos Totales</span>
-                <Calendar className="w-4 h-4 text-[#0B305B]" />
-              </div>
-              <div className="text-2xl font-black text-slate-900">{eventos.length}</div>
-              <div className="text-[10px] text-slate-500">En catálogo académico</div>
-            </div>
-
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-1">
-              <div className="flex items-center justify-between text-slate-400">
-                <span className="text-[11px] font-bold uppercase">Usuarios del Sistema</span>
-                <Users className="w-4 h-4 text-[#0B305B]" />
-              </div>
-              <div className="text-2xl font-black text-slate-900">{usuarios.length}</div>
-              <div className="text-[10px] text-slate-500">Alumnos, profesores y staff</div>
-            </div>
-
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-1">
-              <div className="flex items-center justify-between text-slate-400">
-                <span className="text-[11px] font-bold uppercase">Inscripciones</span>
-                <GraduationCap className="w-4 h-4 text-blue-600" />
-              </div>
-              <div className="text-2xl font-black text-slate-900">{totalInscripciones}</div>
-              <div className="text-[10px] text-slate-500">Registros en plataforma</div>
-            </div>
-
-            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-1">
-              <div className="flex items-center justify-between text-slate-400">
-                <span className="text-[11px] font-bold uppercase">Total Recaudado</span>
-                <DollarSign className="w-4 h-4 text-emerald-600" />
-              </div>
-              <div className="text-2xl font-black text-emerald-700">
-                ${totalRecaudado.toLocaleString()}
-              </div>
-              <div className="text-[10px] text-slate-500">Pagos aprobados en efectivo</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Panel Interactivo Cliente con Pestañas */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Panel Interactivo Cliente con Selector Global 'Vista de Programa', KPIs y Pestañas */}
         <PanelAdminCliente
           eventos={eventos}
           usuarios={usuarios}
@@ -189,10 +178,15 @@ export default async function AdminPage() {
           adminActual={{
             nombre: session.nombre,
             email: session.email,
+            rol: session.rol,
+            carrera: session.carrera,
           }}
+          programas={programas}
+          inscripciones={inscripcionesMapeadas}
+          totalInscripcionesInicial={totalInscripciones}
+          totalRecaudadoInicial={totalRecaudado}
         />
       </main>
     </div>
   )
 }
-

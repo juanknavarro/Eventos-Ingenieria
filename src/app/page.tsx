@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma'
 import { getAuthSession } from '@/lib/auth/session'
 import CatalogoEventosPublico from '@/components/publico/CatalogoEventosPublico'
 import BotonCerrarSesion from '@/components/auth/BotonCerrarSesion'
+import { obtenerConfiguracionPlantillas } from '@/lib/config/plantillas'
 import {
   GraduationCap,
   Award,
@@ -21,8 +22,8 @@ import {
 export const dynamic = 'force-dynamic'
 
 export default async function HomePage() {
-  // 1) Consulta exclusiva de eventos PUBLICADOS y asignaturas activas para bonificaciones
-  const [eventosPublicados, asignaturasActivas, sesion] = await Promise.all([
+  // 1) Consulta exclusiva de eventos PUBLICADOS, asignaturas activas y configuración institucional
+  const [eventosPublicados, asignaturasActivas, configPlantillas, sesion] = await Promise.all([
     prisma.evento.findMany({
       where: {
         estado: 'PUBLICADO',
@@ -45,6 +46,7 @@ export default async function HomePage() {
         { nombre: 'asc' },
       ],
     }),
+    obtenerConfiguracionPlantillas(),
     getAuthSession(),
   ])
 
@@ -65,7 +67,7 @@ export default async function HomePage() {
                   Universidad del Sinú
                 </span>
                 <span className="h-3 w-px bg-slate-300"></span>
-                <span className="text-[11px] font-bold text-slate-500">Seccional Cartagena</span>
+                <span className="text-[11px] font-bold text-slate-500">Sede Montería</span>
               </div>
               <h1 className="text-base sm:text-lg font-extrabold text-[#0B305B] tracking-tight leading-tight">
                 Facultad de Ciencias e Ingenierías &bull; Portal de Eventos
@@ -148,17 +150,16 @@ export default async function HomePage() {
           <div className="relative z-10 max-w-3xl space-y-4">
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-extrabold text-white">
               <Sparkles className="w-3.5 h-3.5 text-[#D2202E]" />
-              Convocatoria Académica Abierta 2026
+              {configPlantillas.titulo_convocatoria || 'Convocatoria Académica Abierta'}
             </div>
 
             <h2 className="text-2xl sm:text-4xl font-black tracking-tight leading-tight">
-              Preinscripción a Eventos, Congresos y Talleres de Ingenierías
+              {configPlantillas.titulo_convocatoria || 'Preinscripción a Eventos, Congresos y Talleres de Ingenierías'}
             </h2>
 
             <p className="text-slate-200 text-xs sm:text-sm leading-relaxed">
-              Explora la oferta académica de la <strong className="text-white">Universidad del Sinú</strong>.
-              Inscríbete con tu número de documento, asegura tu cupo y postula tu asistencia para{' '}
-              <strong className="text-[#F6CDD1] font-bold">bonificaciones en tus asignaturas semestrales</strong>.
+              {configPlantillas.descripcion_convocatoria ||
+                'Explora la oferta académica de la Universidad del Sinú. Inscríbete con tu número de documento, asegura tu cupo y expande tus conocimientos en nuestros espacios de formación continua.'}
             </p>
 
             <div className="pt-2 flex items-center gap-3 flex-wrap">
@@ -168,7 +169,7 @@ export default async function HomePage() {
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-300 font-semibold bg-white/10 px-3.5 py-2 rounded-xl border border-white/15">
                 <BookOpen className="w-4 h-4 text-[#F6CDD1]" />
-                Bonificación de Asignaturas
+                Formación Continua
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-300 font-semibold bg-white/10 px-3.5 py-2 rounded-xl border border-white/15">
                 <Award className="w-4 h-4 text-amber-300" />
@@ -197,7 +198,7 @@ export default async function HomePage() {
       <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 space-y-1">
           <p className="font-bold text-[#0B305B]">
-            Universidad del Sinú &bull; Seccional Cartagena &bull; Facultad de Ciencias e Ingenierías
+            Universidad del Sinú &bull; Sede Montería &bull; Facultad de Ciencias e Ingenierías
           </p>
           <p className="text-[11px] text-slate-400">
             Plataforma Institucional para la Gestión de Eventos, Recaudos y Certificación Digital.

@@ -6,13 +6,40 @@ import { RolUsuario } from '@prisma/client'
 import { getAuthSession } from '@/lib/auth/session'
 import BotonCerrarSesion from '@/components/auth/BotonCerrarSesion'
 
+import { redirect } from 'next/navigation'
+import {
+  esSuperAdmin,
+  filtroEventosPorTenancy,
+  filtroInscripcionesPorTenancy,
+} from '@/lib/auth/multitenancy'
+
 export const dynamic = 'force-dynamic'
 
 export default async function ProfesorAdminPage() {
-  const [profesores, eventos, inscripcionesRaw, sesion] = await Promise.all([
-    // Consultar profesores del sistema
+  const sesion = await getAuthSession()
+  if (
+    !sesion ||
+    (sesion.rol !== RolUsuario.PROFESOR &&
+      sesion.rol !== RolUsuario.ADMIN &&
+      sesion.rol !== RolUsuario.SUPER_ADMIN)
+  ) {
+    redirect('/login?error=acceso_denegado_profesor')
+  }
+
+  const filtroEventos = filtroEventosPorTenancy(sesion)
+  const filtroInscripciones = filtroInscripcionesPorTenancy(sesion)
+  const filtroProfesores =
+    sesion.rol === RolUsuario.SUPER_ADMIN || !sesion.carrera
+      ? { rol: RolUsuario.PROFESOR }
+      : {
+          rol: RolUsuario.PROFESOR,
+          carrera: { contains: sesion.carrera, mode: 'insensitive' as const },
+        }
+
+  const [profesores, eventos, inscripcionesRaw] = await Promise.all([
+    // Consultar profesores del sistema filtrados por programa
     prisma.usuario.findMany({
-      where: { rol: RolUsuario.PROFESOR },
+      where: filtroProfesores,
       select: {
         id: true,
         nombre: true,
@@ -22,8 +49,9 @@ export default async function ProfesorAdminPage() {
       },
       orderBy: { nombre: 'asc' },
     }),
-    // Consultar eventos
+    // Consultar eventos filtrados por programa
     prisma.evento.findMany({
+      where: filtroEventos,
       select: {
         id: true,
         titulo: true,
@@ -32,8 +60,9 @@ export default async function ProfesorAdminPage() {
       },
       orderBy: { fechaInicio: 'asc' },
     }),
-    // Consultar todas las inscripciones con sus detalles
+    // Consultar inscripciones con aislamiento Multi-Tenancy
     prisma.inscripcion.findMany({
+      where: filtroInscripciones,
       include: {
         usuario: {
           select: {
@@ -55,7 +84,6 @@ export default async function ProfesorAdminPage() {
       },
       orderBy: { fechaInscripcion: 'desc' },
     }),
-    getAuthSession(),
   ])
 
   return (

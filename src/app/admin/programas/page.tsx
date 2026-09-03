@@ -1,42 +1,47 @@
-import React from 'react'
+﻿import React from 'react'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import prisma from '@/lib/prisma'
 import { getAuthSession } from '@/lib/auth/session'
-import GestionAsignaturasCliente from '@/components/admin/asignaturas/GestionAsignaturasCliente'
+import { RolUsuario } from '@prisma/client'
+import GestionProgramasCliente from '@/components/admin/programas/GestionProgramasCliente'
 import BotonCerrarSesion from '@/components/auth/BotonCerrarSesion'
-import { ShieldCheck, ArrowLeft, BookOpen, GraduationCap } from 'lucide-react'
-
-import {
-  esSuperAdmin,
-  esAdminOSuperior,
-  filtroAsignaturasPorTenancy,
-} from '@/lib/auth/multitenancy'
+import { ShieldCheck, ArrowLeft, GraduationCap, Building2 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
-export default async function AsignaturasPage() {
+export default async function ProgramasPage() {
   const session = await getAuthSession()
 
-  // Validación estricta en el servidor: SUPER_ADMIN o ADMIN de Programa
-  if (!session || !esAdminOSuperior(session)) {
-    redirect('/login?error=acceso_denegado_admin')
+  // Validación estricta en el servidor: Exclusivo para SUPER_ADMIN
+  if (!session || session.rol !== RolUsuario.SUPER_ADMIN) {
+    redirect('/admin?error=acceso_denegado_superadmin')
   }
 
-  const filtroAsignaturas = filtroAsignaturasPorTenancy(session)
-
-  // Consulta de asignaturas con aislamiento Multi-Tenancy
-  const asignaturas = await prisma.asignatura.findMany({
-    where: filtroAsignaturas,
-    orderBy: [{ programa_academico: 'asc' }, { nombre: 'asc' }],
+  // Consulta de todos los programas con conteo de entidades vinculadas
+  const programas = await prisma.programa.findMany({
+    include: {
+      _count: {
+        select: {
+          usuarios: true,
+          eventos: true,
+          asignaturas: true,
+        },
+      },
+    },
+    orderBy: { nombre: 'asc' },
   })
 
-  const asignaturasMapeadas = asignaturas.map((a) => ({
-    id: a.id,
-    nombre: a.nombre,
-    programa_academico: a.programa_academico,
-    activa: a.activa,
-    createdAt: a.createdAt.toISOString(),
+  const programasMapeados = programas.map((p) => ({
+    id: p.id,
+    nombre: p.nombre,
+    estado_activo: p.estado_activo,
+    createdAt: p.createdAt.toISOString(),
+    _count: {
+      usuarios: p._count.usuarios,
+      eventos: p._count.eventos,
+      asignaturas: p._count.asignaturas,
+    },
   }))
 
   return (
@@ -54,11 +59,11 @@ export default async function AsignaturasPage() {
                   UNISINÚ
                 </span>
                 <span className="text-[10px] tracking-wider text-slate-300 font-bold uppercase">
-                  Gestión Académica de Ingenierías
+                  Gestión Departamental e Ingenierías
                 </span>
               </div>
               <h1 className="text-sm sm:text-base font-bold text-white tracking-tight">
-                Catálogo de Asignaturas para Bonificaciones
+                Catálogo Oficial de Programas Académicos
               </h1>
             </div>
           </div>
@@ -66,7 +71,7 @@ export default async function AsignaturasPage() {
           <div className="flex items-center gap-3">
             <div className="text-right hidden sm:block">
               <div className="text-xs font-bold text-white">{session.nombre}</div>
-              <div className="text-[10px] text-slate-300">{session.email}</div>
+              <div className="text-[10px] text-amber-300 font-semibold uppercase">SUPER ADMINISTRADOR</div>
             </div>
             <BotonCerrarSesion />
           </div>
@@ -75,8 +80,8 @@ export default async function AsignaturasPage() {
 
       {/* Contenido Principal */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
-        {/* Barra de Navegación y Botón 'Volver al Panel' */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+        {/* Barra Superior con Botón Secundario 'Volver al Panel' y Breadcrumb */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-slate-200 shadow-xs">
           <div className="flex items-center gap-3">
             <Link
               href="/admin"
@@ -94,24 +99,23 @@ export default async function AsignaturasPage() {
                   Panel Maestro
                 </Link>
                 <span>/</span>
-                <span className="text-[#0B305B] font-bold">Asignaturas</span>
+                <span className="text-[#0B305B] font-bold">Programas Académicos</span>
               </div>
               <h2 className="text-sm font-extrabold text-slate-900 mt-0.5">
-                Configuración de Materias por Programa Académico
+                Administración y Configuración de Programas de la Facultad
               </h2>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-bold text-[#0B305B] bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
-            <GraduationCap className="w-4 h-4 text-[#D2202E]" />
-            Programas: Sistemas, Industrial, Civil, Eléctrica, Mecánica y Básicas
+          <div className="flex items-center gap-2 text-xs font-bold text-[#0B305B] bg-slate-50 px-3.5 py-1.5 rounded-xl border border-slate-100">
+            <Building2 className="w-4 h-4 text-[#D2202E]" />
+            {programas.length} Programas Registrados
           </div>
         </div>
 
-        {/* Módulo Cliente con Tabla, Botón '+ Agregar Asignatura', Modales y Toggle */}
-        <GestionAsignaturasCliente asignaturasIniciales={asignaturasMapeadas} />
+        {/* Componente CRUD Interactivo */}
+        <GestionProgramasCliente programasIniciales={programasMapeados} />
       </main>
     </div>
   )
 }
-

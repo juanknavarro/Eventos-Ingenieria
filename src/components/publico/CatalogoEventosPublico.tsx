@@ -77,7 +77,7 @@ const SEMESTRES = [
   'Egresado / Graduado',
 ]
 
-const ASIGNATURAS_BONIFICACION = [
+const ASIGNATURAS_FALLBACK = [
   'Inteligencia Artificial y Machine Learning',
   'Algoritmos y Estructura de Datos',
   'Programación Orientada a Objetos',
@@ -89,7 +89,7 @@ const ASIGNATURAS_BONIFICACION = [
   'Investigación de Operaciones',
   'Gestión y Evaluación de Proyectos de TI',
   'Electiva Profesional de Profundización',
-  'No aplica bonificación académica',
+  'No aplica / Formación General',
 ]
 
 export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Props) {
@@ -104,7 +104,7 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
   const [carreraInput, setCarreraInput] = useState(PROGRAMAS_ACADEMICOS[0])
   const [semestreInput, setSemestreInput] = useState('6to Semestre')
   const [asignaturaInput, setAsignaturaInput] = useState(
-    asignaturas.length > 0 ? asignaturas[0].nombre : ASIGNATURAS_BONIFICACION[0]
+    asignaturas.length > 0 ? asignaturas[0].nombre : ASIGNATURAS_FALLBACK[0]
   )
 
   // Agrupamiento dinámico de asignaturas por programa académico
@@ -151,7 +151,7 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
     setCarreraInput(PROGRAMAS_ACADEMICOS[0])
     setSemestreInput('6to Semestre')
     setAsignaturaInput(
-      asignaturas.length > 0 ? asignaturas[0].nombre : ASIGNATURAS_BONIFICACION[0]
+      asignaturas.length > 0 ? asignaturas[0].nombre : ASIGNATURAS_FALLBACK[0]
     )
     setAlertaCedulaDuplicada(null)
     setMensajeErrorServidor(null)
@@ -240,7 +240,7 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
               Eventos Académicos Disponibles ({eventosFiltrados.length})
             </h2>
             <p className="text-xs text-slate-500">
-              Selecciona tu evento y asegura tu cupo para aplicar a bonificaciones académicas
+              Selecciona tu evento y asegura tu cupo para participar
             </p>
           </div>
         </div>
@@ -639,11 +639,11 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
                     </div>
                   </div>
 
-                  {/* 3) Asignatura a aplicar bonificación consumiendo la tabla Asignaturas agrupada */}
+                  {/* 3) Asignatura de interés consumiendo la tabla Asignaturas agrupada */}
                   <div className="space-y-1">
                     <label className="font-bold text-slate-800 flex items-center gap-1">
                       <BookOpen className="w-3.5 h-3.5 text-[#0B305B]" />
-                      Asignatura a Aplicar Bonificación Académica <span className="text-[#D2202E]">*</span>
+                      Asignatura de Interés Académico <span className="text-[#D2202E]">*</span>
                     </label>
                     <select
                       name="asignatura_bonificacion"
@@ -664,20 +664,20 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
                           </optgroup>
                         ))
                       ) : (
-                        ASIGNATURAS_BONIFICACION.map((asig) => (
+                        ASIGNATURAS_FALLBACK.map((asig) => (
                           <option key={asig} value={asig}>
                             {asig}
                           </option>
                         ))
                       )}
                       <optgroup label="Opciones Generales">
-                        <option value="No aplica bonificación académica">
-                          No aplica bonificación académica
+                        <option value="No aplica / Formación General">
+                          No aplica / Formación General
                         </option>
                       </optgroup>
                     </select>
                     <p className="text-[10px] text-slate-400">
-                      Materia activa de la Facultad donde el docente validará la bonificación académica.
+                      Materia o área académica vinculada a tu participación en el evento.
                     </p>
                   </div>
                 </div>

@@ -4,10 +4,12 @@ import prisma from '@/lib/prisma'
 import { getAuthSession } from '@/lib/auth/session'
 import { revalidatePath } from 'next/cache'
 
+import { RolUsuario } from '@prisma/client'
+
 async function verificarAdmin() {
   const session = await getAuthSession()
-  if (!session || session.rol !== 'ADMIN') {
-    throw new Error('Acceso no autorizado. Se requiere rol de Administrador.')
+  if (!session || (session.rol !== RolUsuario.SUPER_ADMIN && session.rol !== RolUsuario.ADMIN)) {
+    throw new Error('Acceso no autorizado. Se requieren privilegios de Administrador.')
   }
   return session
 }

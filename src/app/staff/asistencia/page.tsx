@@ -6,17 +6,65 @@ import { RolUsuario } from '@prisma/client'
 import { getAuthSession } from '@/lib/auth/session'
 import BotonCerrarSesion from '@/components/auth/BotonCerrarSesion'
 
+import { redirect } from 'next/navigation'
+import {
+  esSuperAdmin,
+  filtroEventosPorTenancy,
+} from '@/lib/auth/multitenancy'
+
 export const dynamic = 'force-dynamic'
 
 export default async function ControlAsistenciaStaffPage() {
-  const [staffList, eventos, asistenciasRaw, sesion] = await Promise.all([
-    // Consultar usuarios con rol STAFF o ADMIN
+  const sesion = await getAuthSession()
+  if (
+    !sesion ||
+    (sesion.rol !== RolUsuario.STAFF &&
+      sesion.rol !== RolUsuario.ADMIN &&
+      sesion.rol !== RolUsuario.SUPER_ADMIN &&
+      sesion.rol !== RolUsuario.PROFESOR)
+  ) {
+    redirect('/login?error=acceso_denegado_staff')
+  }
+
+  const filtroEventos = filtroEventosPorTenancy(sesion)
+  const filtroStaff =
+    sesion.rol === RolUsuario.SUPER_ADMIN || !sesion.carrera
+      ? {
+          rol: {
+            in: [RolUsuario.STAFF, RolUsuario.ADMIN, RolUsuario.PROFESOR],
+          },
+        }
+      : {
+          rol: {
+            in: [RolUsuario.STAFF, RolUsuario.ADMIN, RolUsuario.PROFESOR],
+          },
+          carrera: { contains: sesion.carrera, mode: 'insensitive' as const },
+        }
+
+  const filtroAsistencias =
+    sesion.rol === RolUsuario.SUPER_ADMIN || !sesion.carrera
+      ? {}
+      : {
+          OR: [
+            {
+              inscripcion: {
+                usuario: {
+                  carrera: { contains: sesion.carrera, mode: 'insensitive' as const },
+                },
+              },
+            },
+            {
+              inscripcion: {
+                evento: { programa_academico: sesion.carrera },
+              },
+            },
+          ],
+        }
+
+  const [staffList, eventos, asistenciasRaw] = await Promise.all([
+    // Consultar usuarios con rol STAFF o ADMIN filtrados por programa
     prisma.usuario.findMany({
-      where: {
-        rol: {
-          in: [RolUsuario.STAFF, RolUsuario.ADMIN, RolUsuario.PROFESOR],
-        },
-      },
+      where: filtroStaff,
       select: {
         id: true,
         nombre: true,
@@ -26,8 +74,9 @@ export default async function ControlAsistenciaStaffPage() {
       },
       orderBy: { nombre: 'asc' },
     }),
-    // Consultar eventos activos
+    // Consultar eventos activos filtrados por programa
     prisma.evento.findMany({
+      where: filtroEventos,
       select: {
         id: true,
         titulo: true,
@@ -40,8 +89,9 @@ export default async function ControlAsistenciaStaffPage() {
       },
       orderBy: { fechaInicio: 'asc' },
     }),
-    // Consultar asistencias recientes
+    // Consultar asistencias recientes con aislamiento
     prisma.asistencia.findMany({
+      where: filtroAsistencias,
       include: {
         inscripcion: {
           include: {

@@ -7,6 +7,8 @@ import FormularioEventoCliente from '@/components/admin/FormularioEventoCliente'
 import { ArrowLeft, Sparkles, Calendar, ShieldCheck } from 'lucide-react'
 import BotonCerrarSesion from '@/components/auth/BotonCerrarSesion'
 
+import { esAdminOSuperior, esSuperAdmin } from '@/lib/auth/multitenancy'
+
 export const dynamic = 'force-dynamic'
 
 interface Props {
@@ -16,18 +18,35 @@ interface Props {
 export default async function NuevoEventoPage({ searchParams }: Props) {
   const session = await getAuthSession()
 
-  // Protección del lado del servidor: Estrictamente para rol ADMIN
-  if (!session || session.rol !== 'ADMIN') {
+  // Protección del lado del servidor: Estrictamente para SUPER_ADMIN o ADMIN de Programa
+  if (!session || !esAdminOSuperior(session)) {
     redirect('/login?error=acceso_denegado_admin')
   }
 
   const { id } = await searchParams
-  let eventoInicial = null
 
-  if (id) {
-    eventoInicial = await prisma.evento.findUnique({
-      where: { id },
-    })
+  const [eventoInicial, programas] = await Promise.all([
+    id
+      ? prisma.evento.findUnique({
+          where: { id },
+          include: { organizador: true },
+        })
+      : Promise.resolve(null),
+    prisma.programa.findMany({
+      where: { estado_activo: true },
+      select: { id: true, nombre: true },
+      orderBy: { nombre: 'asc' },
+    }),
+  ])
+
+  // Validar pertenencia si es ADMIN de programa
+  if (eventoInicial && !esSuperAdmin(session) && session.carrera) {
+    if (
+      eventoInicial.programa_academico !== session.carrera &&
+      !eventoInicial.organizador?.carrera?.toLowerCase().includes(session.carrera.toLowerCase())
+    ) {
+      redirect('/admin?error=acceso_denegado_evento')
+    }
   }
 
   const esEdicion = !!eventoInicial
@@ -109,7 +128,12 @@ export default async function NuevoEventoPage({ searchParams }: Props) {
         </div>
 
         {/* 2 y 3) Formulario en página completa dividido en 2 columnas responsive */}
-        <FormularioEventoCliente eventoInicial={eventoInicial} />
+        <FormularioEventoCliente
+          eventoInicial={eventoInicial}
+          programaUsuario={session.carrera}
+          esSuperAdmin={esSuperAdmin(session)}
+          programas={programas}
+        />
       </main>
     </div>
   )
