@@ -102,6 +102,7 @@ model Inscripcion {
   usuarioId                   String
   
   // Campos solicitados específicamente para gestión académica y financiera
+  celular                     String?    // Teléfono celular del estudiante para contacto y confirmación
   asignatura_bonificacion     String?    // Asignatura donde se aplicará la bonificación académica
   profesor_responsable_dinero String?    // Nombre/descripción del docente encargado de recaudar/validar
   profesorResponsableId       String?    // Relación referencial opcional al usuario docente
@@ -153,6 +154,18 @@ model ConfiguracionPlantillas {
   createdAt        DateTime @default(now())
 
   @@map("configuracion_plantillas")
+}
+
+// Asignaturas académicas para bonificaciones
+model Asignatura {
+  id                 String   @id @default(cuid())
+  nombre             String
+  programa_academico String   // Ej. "Ingeniería de Sistemas", "Ingeniería Industrial", etc.
+  activa             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("asignaturas")
 }
 
 

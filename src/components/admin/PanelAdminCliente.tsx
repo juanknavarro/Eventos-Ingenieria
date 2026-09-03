@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import Link from 'next/link'
 import {
   Calendar,
   Users,
@@ -25,15 +26,17 @@ import {
   Palette,
   PenTool,
   Save,
+  BarChart3,
+  BookOpen,
 } from 'lucide-react'
 import { RolUsuario, EstadoEvento } from '@prisma/client'
 import {
-  crearEvento,
-  actualizarEvento,
   eliminarEvento,
   cambiarRolUsuario,
   registrarPersonal,
   actualizarConfiguracionPlantillas,
+  actualizarUsuario,
+  eliminarUsuario,
 } from '@/actions/admin'
 import SelectorRecursoGrafico from './SelectorRecursoGrafico'
 import { ConfiguracionPlantillasData } from '@/lib/config/plantillas'
@@ -92,12 +95,12 @@ export default function PanelAdminCliente({
   const [mensajeError, setMensajeError] = useState<string | null>(null)
   const [cargandoAccion, setCargandoAccion] = useState(false)
 
-  // Estados de Modal de Evento (Crear / Editar)
-  const [modalEventoAbierto, setModalEventoAbierto] = useState(false)
-  const [eventoEnEdicion, setEventoEnEdicion] = useState<EventoData | null>(null)
-
   // Estado de Modal de Registro de Personal (Profesor / Staff)
   const [modalPersonalAbierto, setModalPersonalAbierto] = useState(false)
+
+  // Estados para Edición y Eliminación de Usuarios
+  const [usuarioEnEdicion, setUsuarioEnEdicion] = useState<UsuarioData | null>(null)
+  const [usuarioAEliminar, setUsuarioAEliminar] = useState<UsuarioData | null>(null)
 
   // Filtro de búsqueda en usuarios
   const [busquedaUsuario, setBusquedaUsuario] = useState('')
@@ -160,27 +163,36 @@ export default function PanelAdminCliente({
     mostrarMensaje(res.success, res.message || res.error || '')
   }
 
-  // Manejo de guardado de evento (crear o actualizar)
-  const handleGuardarEvento = async (e: React.FormEvent<HTMLFormElement>) => {
+  // Manejo de actualización de datos de usuario (nombre, correo, cédula, carrera)
+  const handleActualizarUsuario = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    if (!usuarioEnEdicion) return
     setCargandoAccion(true)
     const formData = new FormData(e.currentTarget)
-
-    let res
-    if (eventoEnEdicion) {
-      formData.append('eventoId', eventoEnEdicion.id)
-      res = await actualizarEvento(formData)
-    } else {
-      res = await crearEvento(formData)
-    }
-
+    formData.append('usuarioId', usuarioEnEdicion.id)
+    const res = await actualizarUsuario(formData)
     setCargandoAccion(false)
+
     if (res.success) {
-      setModalEventoAbierto(false)
-      setEventoEnEdicion(null)
-      mostrarMensaje(true, res.message || 'Evento guardado exitosamente.')
+      setUsuarioEnEdicion(null)
+      mostrarMensaje(true, res.message || 'Usuario actualizado exitosamente.')
     } else {
-      mostrarMensaje(false, res.error || 'Error al guardar evento.')
+      mostrarMensaje(false, res.error || 'Error al actualizar usuario.')
+    }
+  }
+
+  // Manejo de eliminación permanente de usuario
+  const handleConfirmarEliminarUsuario = async () => {
+    if (!usuarioAEliminar) return
+    setCargandoAccion(true)
+    const res = await eliminarUsuario(usuarioAEliminar.id)
+    setCargandoAccion(false)
+
+    if (res.success) {
+      setUsuarioAEliminar(null)
+      mostrarMensaje(true, res.message || 'Usuario eliminado permanentemente.')
+    } else {
+      mostrarMensaje(false, res.error || 'Error al eliminar usuario.')
     }
   }
 
@@ -258,6 +270,22 @@ export default function PanelAdminCliente({
           <FileText className="w-4 h-4" />
           Configurar Plantillas PDF
         </button>
+
+        <Link
+          href="/admin/asignaturas"
+          className="px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer text-slate-700 bg-white hover:text-[#0B305B] hover:shadow-xs border border-slate-200/80 sm:ml-auto"
+        >
+          <BookOpen className="w-4 h-4 text-[#0B305B]" />
+          Catálogo Asignaturas
+        </Link>
+
+        <Link
+          href="/admin/reportes"
+          className="px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer text-slate-700 bg-white hover:text-[#0B305B] hover:shadow-xs border border-slate-200/80"
+        >
+          <BarChart3 className="w-4 h-4 text-[#D2202E]" />
+          Reportes y Auditoría
+        </Link>
       </div>
 
       {/* ========================================================================= */}
@@ -272,16 +300,13 @@ export default function PanelAdminCliente({
                 Administra congresos, talleres, hackathons y sus recursos visuales (fondos, fotos centrales y patrocinadores).
               </p>
             </div>
-            <button
-              onClick={() => {
-                setEventoEnEdicion(null)
-                setModalEventoAbierto(true)
-              }}
+            <Link
+              href="/admin/eventos/nuevo"
               className="px-4 py-2 bg-[#D2202E] hover:bg-[#B01824] text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               Crear Nuevo Evento
-            </button>
+            </Link>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -350,16 +375,13 @@ export default function PanelAdminCliente({
 
                 {/* Acciones del Evento */}
                 <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
-                  <button
-                    onClick={() => {
-                      setEventoEnEdicion(evento)
-                      setModalEventoAbierto(true)
-                    }}
+                  <Link
+                    href={`/admin/eventos/nuevo?id=${evento.id}`}
                     className="flex-1 py-1.5 px-3 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <Edit2 className="w-3.5 h-3.5 text-[#0B305B]" />
                     Editar
-                  </button>
+                  </Link>
                   <button
                     onClick={() => handleEliminarEvento(evento.id, evento.titulo)}
                     disabled={cargandoAccion}
@@ -420,11 +442,13 @@ export default function PanelAdminCliente({
                     <th className="py-3 px-4 font-bold">Programa Académico</th>
                     <th className="py-3 px-4 font-bold">Rol Actual</th>
                     <th className="py-3 px-4 font-bold text-center">Asignar Permisos</th>
+                    <th className="py-3 px-4 font-bold text-center">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {usuariosFiltrados.map((u) => {
                     const esAdminPrincipal = u.email === 'juannavarro@unisinu.edu.co'
+                    const esMismoAdmin = u.email === adminActual.email
                     return (
                       <tr key={u.id} className="hover:bg-slate-50/80 transition">
                         <td className="py-3 px-4">
@@ -483,6 +507,38 @@ export default function PanelAdminCliente({
                               <option value="ADMIN">ADMIN (Acceso Total)</option>
                             </select>
                           )}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            {/* 1) Botón Editar (ícono de lápiz) */}
+                            <button
+                              type="button"
+                              onClick={() => setUsuarioEnEdicion(u)}
+                              title="Editar datos del usuario"
+                              className="p-1.5 text-[#0B305B] hover:text-white hover:bg-[#0B305B] rounded-lg transition cursor-pointer"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* 2 y 3) Botón Eliminar con Regla de Seguridad para Administrador */}
+                            {esAdminPrincipal || esMismoAdmin ? (
+                              <span
+                                title="Cuenta protegida contra eliminación"
+                                className="p-1.5 text-slate-300 cursor-not-allowed inline-flex items-center"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 opacity-30" />
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setUsuarioAEliminar(u)}
+                                title="Eliminar usuario permanentemente"
+                                className="p-1.5 text-rose-600 hover:text-white hover:bg-[#D2202E] rounded-lg transition cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     )
@@ -772,210 +828,6 @@ export default function PanelAdminCliente({
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL: CREAR / EDITAR EVENTO */}
-      {/* ========================================================================= */}
-      {modalEventoAbierto && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-xl w-full border border-slate-200 shadow-2xl overflow-hidden my-8">
-            <div className="bg-[#0B305B] text-white p-5 border-b-2 border-[#D2202E] flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-sm">
-                  {eventoEnEdicion ? 'Editar Evento Académico' : 'Crear Nuevo Evento'}
-                </h3>
-                <p className="text-xs text-slate-300">
-                  Facultad de Ciencias e Ingenierías &bull; Universidad del Sinú
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  setModalEventoAbierto(false)
-                  setEventoEnEdicion(null)
-                }}
-                className="p-1 hover:bg-white/10 rounded-full transition cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleGuardarEvento} className="p-6 space-y-4 text-xs">
-              <div className="space-y-1">
-                <label className="font-bold text-slate-700">Título del Evento *</label>
-                <input
-                  type="text"
-                  name="titulo"
-                  defaultValue={eventoEnEdicion?.titulo || ''}
-                  required
-                  placeholder="Ej. Congreso Internacional de IA y Software 2026"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-bold text-slate-700">Descripción *</label>
-                <textarea
-                  name="descripcion"
-                  defaultValue={eventoEnEdicion?.descripcion || ''}
-                  rows={3}
-                  required
-                  placeholder="Describe la temática, ponentes o actividades del evento..."
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none resize-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-700">Fecha de Inicio *</label>
-                  <input
-                    type="datetime-local"
-                    name="fechaInicio"
-                    defaultValue={
-                      eventoEnEdicion?.fechaInicio
-                        ? new Date(eventoEnEdicion.fechaInicio).toISOString().slice(0, 16)
-                        : ''
-                    }
-                    required
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-700">Fecha de Finalización</label>
-                  <input
-                    type="datetime-local"
-                    name="fechaFin"
-                    defaultValue={
-                      eventoEnEdicion?.fechaFin
-                        ? new Date(eventoEnEdicion.fechaFin).toISOString().slice(0, 16)
-                        : ''
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-700">Ubicación / Aula *</label>
-                  <input
-                    type="text"
-                    name="ubicacion"
-                    defaultValue={eventoEnEdicion?.ubicacion || ''}
-                    required
-                    placeholder="Ej. Auditorio Principal"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-700">Precio (COP)</label>
-                  <input
-                    type="number"
-                    name="precio"
-                    defaultValue={eventoEnEdicion?.precio ?? 0}
-                    step="500"
-                    placeholder="0 para gratuito"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="font-bold text-slate-700">Capacidad Máxima</label>
-                  <input
-                    type="number"
-                    name="capacidadMaxima"
-                    defaultValue={eventoEnEdicion?.capacidadMaxima ?? ''}
-                    placeholder="Vacío = Sin límite"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-bold text-slate-700">Estado del Evento</label>
-                <select
-                  name="estado"
-                  defaultValue={eventoEnEdicion?.estado || 'PUBLICADO'}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none"
-                >
-                  <option value="PUBLICADO">PUBLICADO (Visible para inscripciones)</option>
-                  <option value="BORRADOR">BORRADOR</option>
-                  <option value="EN_CURSO">EN CURSO</option>
-                  <option value="FINALIZADO">FINALIZADO</option>
-                  <option value="CANCELADO">CANCELADO</option>
-                </select>
-              </div>
-
-              {/* Sección de Recursos Gráficos para Escarapela con Pestañas (URL vs Subir Archivo) */}
-              <div className="space-y-3 pt-1">
-                <div className="flex items-center justify-between">
-                  <p className="font-extrabold text-slate-800 text-xs">
-                    Recursos Gráficos para Escarapelas y Carnets (90 x 130 mm):
-                  </p>
-                  <span className="text-[10px] font-semibold text-slate-400">
-                    Soporta URL directa o subida a Supabase
-                  </span>
-                </div>
-
-                {/* 1. Imagen Central del Evento */}
-                <SelectorRecursoGrafico
-                  etiqueta="Imagen Central del Evento"
-                  descripcion="Ilustración o fotografía temática proyectada en el centro del carnet (reemplaza la bonificación)."
-                  nombreCampoUrl="imagen_central_url"
-                  nombreCampoArchivo="archivo_imagen_central"
-                  valorInicialUrl={eventoEnEdicion?.imagen_central_url}
-                  aspectoRecomendado="Horizontal (16:9 o 3:2)"
-                />
-
-                {/* 2. Imagen de Cabecera / Fondo */}
-                <SelectorRecursoGrafico
-                  etiqueta="Imagen de Fondo o Cabecera Superior"
-                  descripcion="Fondo decorativo superior de la escarapela tras el título y membrete institucional."
-                  nombreCampoUrl="logo_fondo_url"
-                  nombreCampoArchivo="archivo_logo_fondo"
-                  valorInicialUrl={eventoEnEdicion?.logo_fondo_url}
-                  aspectoRecomendado="Panorámica (4:1 o 3:1)"
-                />
-
-                {/* 3. Franja de Patrocinadores (Sponsors) */}
-                <SelectorRecursoGrafico
-                  etiqueta="Franja de Patrocinadores Oficiales"
-                  descripcion="Banner o tira de logotipos de empresas y aliados institucionales en el pie de la escarapela."
-                  nombreCampoUrl="sponsors_url"
-                  nombreCampoArchivo="archivo_sponsors"
-                  valorInicialUrl={eventoEnEdicion?.sponsors_url}
-                  aspectoRecomendado="Franja Horizontal (5:1 o 6:1)"
-                />
-              </div>
-
-              <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setModalEventoAbierto(false)
-                    setEventoEnEdicion(null)
-                  }}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={cargandoAccion}
-                  className="px-5 py-2 bg-[#D2202E] hover:bg-[#B01824] text-white font-bold rounded-xl shadow-md shadow-[#D2202E]/20 transition flex items-center gap-2 cursor-pointer"
-                >
-                  {cargandoAccion ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Guardando...
-                    </>
-                  ) : (
-                    'Guardar Evento'
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
       {/* MODAL: REGISTRAR PERSONAL (PROFESOR / STAFF) */}
       {/* ========================================================================= */}
       {modalPersonalAbierto && (
@@ -1112,6 +964,206 @@ export default function PanelAdminCliente({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: EDITAR USUARIO */}
+      {/* ========================================================================= */}
+      {usuarioEnEdicion && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden my-8">
+            <div className="bg-[#0B305B] text-white p-5 border-b-2 border-[#D2202E] flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/10 rounded-xl">
+                  <Edit2 className="w-5 h-5 text-[#D2202E]" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm">Editar Datos de Usuario</h3>
+                  <p className="text-xs text-slate-300">
+                    Actualiza la información institucional y académica en la base de datos
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUsuarioEnEdicion(null)}
+                className="p-1 hover:bg-white/10 rounded-full transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleActualizarUsuario} className="p-6 space-y-4 text-xs">
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700">Nombre Completo *</label>
+                <input
+                  type="text"
+                  name="nombre"
+                  defaultValue={usuarioEnEdicion.nombre}
+                  required
+                  placeholder="Ej. Ing. Carlos Mendoza"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Correo Institucional *</label>
+                  <input
+                    type="email"
+                    name="email"
+                    defaultValue={usuarioEnEdicion.email}
+                    required
+                    placeholder="usuario@unisinu.edu.co"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-bold text-slate-700">Cédula / Identificación</label>
+                  <input
+                    type="text"
+                    name="cedula"
+                    defaultValue={usuarioEnEdicion.cedula || ''}
+                    placeholder="Ej. 1047891234"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700">Programa Académico / Facultad</label>
+                <input
+                  type="text"
+                  name="carrera"
+                  defaultValue={usuarioEnEdicion.carrera || 'Facultad de Ingenierías'}
+                  placeholder="Ej. Ingeniería de Sistemas, Ingeniería Industrial..."
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none"
+                />
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between text-[11px]">
+                <span className="text-slate-500">Rol asignado en el sistema:</span>
+                <span className="font-extrabold text-[#0B305B] bg-white px-2 py-0.5 rounded border border-slate-200">
+                  {usuarioEnEdicion.rol}
+                </span>
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setUsuarioEnEdicion(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={cargandoAccion}
+                  className="px-5 py-2 bg-[#0B305B] hover:bg-[#071F3B] text-white font-bold rounded-xl shadow-md shadow-[#0B305B]/20 transition flex items-center gap-2 cursor-pointer"
+                >
+                  {cargandoAccion ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Actualizando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 text-[#D2202E]" />
+                      Guardar Cambios
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: CONFIRMAR ELIMINACIÓN DE USUARIO */}
+      {/* ========================================================================= */}
+      {usuarioAEliminar && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden my-8">
+            <div className="bg-[#D2202E] text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/10 rounded-xl">
+                  <Trash2 className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm">Eliminar Usuario Permanentemente</h3>
+                  <p className="text-xs text-white/80">Esta acción no se puede deshacer</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUsuarioAEliminar(null)}
+                className="p-1 hover:bg-white/10 rounded-full transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs">
+              <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl space-y-2">
+                <p className="font-bold text-rose-900 text-xs">
+                  ¿Confirmas que deseas eliminar a este usuario de la base de datos de Supabase?
+                </p>
+                <div className="bg-white p-3 rounded-xl border border-rose-100 text-slate-700 space-y-1">
+                  <div>
+                    <span className="font-bold text-slate-900">Nombre: </span>
+                    {usuarioAEliminar.nombre}
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-900">Correo: </span>
+                    <span className="font-mono text-[11px]">{usuarioAEliminar.email}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-900">Cédula: </span>
+                    <span className="font-mono">{usuarioAEliminar.cedula || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-900">Rol actual: </span>
+                    <span className="font-bold text-[#0B305B]">{usuarioAEliminar.rol}</span>
+                  </div>
+                </div>
+                <p className="text-[11px] text-rose-700 leading-relaxed">
+                  Se eliminarán también sus registros de inscripción asociados en eventos académicos.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setUsuarioAEliminar(null)}
+                  disabled={cargandoAccion}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmarEliminarUsuario}
+                  disabled={cargandoAccion}
+                  className="px-5 py-2 bg-[#D2202E] hover:bg-[#B01824] text-white font-bold rounded-xl shadow-md shadow-[#D2202E]/20 transition flex items-center gap-2 cursor-pointer"
+                >
+                  {cargandoAccion ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Eliminando...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      Eliminar Definitivamente
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

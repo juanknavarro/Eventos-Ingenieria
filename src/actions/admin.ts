@@ -417,4 +417,141 @@ export async function actualizarConfiguracionPlantillas(formData: FormData): Pro
   }
 }
 
+/**
+ * Actualiza los datos de un usuario (nombre, correo, cédula y programa académico)
+ */
+export async function actualizarUsuario(formData: FormData): Promise<ActionResult> {
+  try {
+    await asegurarAdmin()
+
+    const usuarioId = formData.get('usuarioId') as string
+    const nombre = (formData.get('nombre') as string)?.trim()
+    const email = (formData.get('email') as string)?.trim().toLowerCase()
+    const cedula = (formData.get('cedula') as string)?.trim()
+    const carrera = (formData.get('carrera') as string)?.trim()
+
+    if (!usuarioId || !nombre || !email) {
+      return { success: false, error: 'El nombre y correo electrónico son obligatorios.' }
+    }
+
+    // Validar que el nuevo correo no esté tomado por otro usuario
+    const correoEnUso = await prisma.usuario.findFirst({
+      where: {
+        email,
+        NOT: { id: usuarioId },
+      },
+    })
+
+    if (correoEnUso) {
+      return { success: false, error: `El correo "${email}" ya se encuentra registrado por otro usuario.` }
+    }
+
+    // Validar que la cédula no esté tomada por otro usuario (si se suministra)
+    if (cedula) {
+      const cedulaEnUso = await prisma.usuario.findFirst({
+        where: {
+          OR: [{ cedula }, { codigoEstudiantil: cedula }],
+          NOT: { id: usuarioId },
+        },
+      })
+
+      if (cedulaEnUso) {
+        return { success: false, error: `La cédula "${cedula}" ya se encuentra registrada por otro usuario.` }
+      }
+    }
+
+    const usuarioActualizado = await prisma.usuario.update({
+      where: { id: usuarioId },
+      data: {
+        nombre,
+        email,
+        cedula: cedula || null,
+        codigoEstudiantil: cedula || undefined,
+        carrera: carrera || null,
+      },
+    })
+
+    revalidatePath('/admin')
+    revalidatePath('/profesor')
+    revalidatePath('/staff/asistencia')
+
+    return {
+      success: true,
+      message: `Usuario "${usuarioActualizado.nombre}" actualizado correctamente.`,
+    }
+  } catch (err: unknown) {
+    console.error('Error al actualizar usuario:', err)
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Error al actualizar usuario.',
+    }
+  }
+}
+
+/**
+ * Elimina permanentemente un usuario del sistema (con protecciones de seguridad para ADMIN)
+ */
+export async function eliminarUsuario(usuarioId: string): Promise<ActionResult> {
+  try {
+    await asegurarAdmin()
+    const session = await getAuthSession()
+
+    // 1. Regla de seguridad: Evitar autoborrado accidental del usuario autenticado
+    if (session?.id === usuarioId) {
+      return {
+        success: false,
+        error: 'Operación no permitida: No puedes eliminar tu propia cuenta de Administrador mientras estás en sesión.',
+      }
+    }
+
+    const usuario = await prisma.usuario.findUnique({
+      where: { id: usuarioId },
+      include: {
+        eventosOrganizados: true,
+      },
+    })
+
+    if (!usuario) {
+      return { success: false, error: 'El usuario especificado no existe.' }
+    }
+
+    // 2. Proteger al Super Administrador institucional oficial
+    if (usuario.email === 'juannavarro@unisinu.edu.co') {
+      return {
+        success: false,
+        error: 'La cuenta principal de Super Administrador (Juan Carlos Navarro Ramos) está protegida contra eliminación.',
+      }
+    }
+
+    // Si tiene eventos organizados, reasignarlos temporalmente al admin en sesión para no violar Restrict
+    if (usuario.eventosOrganizados.length > 0 && session?.id) {
+      await prisma.evento.updateMany({
+        where: { organizadorId: usuarioId },
+        data: { organizadorId: session.id },
+      })
+    }
+
+    // Proceder a la eliminación (las inscripciones se eliminan en cascada por Prisma)
+    await prisma.usuario.delete({
+      where: { id: usuarioId },
+    })
+
+    revalidatePath('/admin')
+    revalidatePath('/profesor')
+    revalidatePath('/staff/asistencia')
+
+    return {
+      success: true,
+      message: `Usuario "${usuario.nombre}" eliminado exitosamente del sistema.`,
+    }
+  } catch (err: unknown) {
+    console.error('Error al eliminar usuario:', err)
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Error al eliminar usuario.',
+    }
+  }
+}
+
+
 
