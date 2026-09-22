@@ -18,6 +18,8 @@ import {
   GraduationCap,
   RotateCcw,
   Check,
+  Banknote,
+  Landmark,
 } from 'lucide-react'
 import ModalRegistrarPago, { InscripcionData } from './ModalRegistrarPago'
 import { revertirPago } from '@/actions/pagos'
@@ -38,28 +40,25 @@ export interface EventoOption {
 }
 
 interface PanelProfesorClienteProps {
-  profesores: ProfesorUsuario[]
+  docenteActual?: ProfesorUsuario
+  profesores?: ProfesorUsuario[]
   eventos: EventoOption[]
   inscripcionesIniciales: InscripcionData[]
 }
 
 export default function PanelProfesorCliente({
-  profesores,
+  docenteActual,
+  profesores = [],
   eventos,
   inscripcionesIniciales,
 }: PanelProfesorClienteProps) {
-  // Estado para el profesor activo (por defecto el primer docente)
-  const [profesorId, setProfesorId] = useState<string>(
-    profesores[0]?.id || ''
-  )
-  const profesorActivo = useMemo(
-    () => profesores.find((p) => p.id === profesorId) || profesores[0],
-    [profesores, profesorId]
-  )
+  // Datos del docente autenticado leídos exclusivamente de la sesión
+  const profesorActivo = docenteActual || profesores[0]
 
   // Filtros
   const [eventoFiltro, setEventoFiltro] = useState<string>('TODOS')
   const [estadoFiltro, setEstadoFiltro] = useState<string>('TODOS')
+  const [metodoFiltro, setMetodoFiltro] = useState<string>('TODOS')
   const [busqueda, setBusqueda] = useState<string>('')
 
   // Estado del Modal
@@ -79,12 +78,19 @@ export default function PanelProfesorCliente({
         return false
       }
 
-      // Filtro por estado
+      // Filtro por estado de pago
       if (estadoFiltro !== 'TODOS' && ins.estado_pago !== estadoFiltro) {
         return false
       }
 
-      // Búsqueda por texto (nombre, código o correo)
+      // Filtro por método de pago con retrocompatibilidad
+      if (metodoFiltro !== 'TODOS') {
+        const esEfectivo = ins.metodo_pago === 'EFECTIVO' || (!ins.metodo_pago && ins.estado_pago === 'PAGADO')
+        if (metodoFiltro === 'EFECTIVO' && !esEfectivo) return false
+        if (metodoFiltro === 'TRANSFERENCIA' && ins.metodo_pago !== 'TRANSFERENCIA') return false
+      }
+
+      // Búsqueda por texto (nombre, código, correo o materia)
       if (busqueda.trim() !== '') {
         const query = busqueda.toLowerCase()
         const matchNombre = ins.usuario.nombre.toLowerCase().includes(query)
@@ -98,9 +104,9 @@ export default function PanelProfesorCliente({
 
       return true
     })
-  }, [inscripcionesIniciales, eventoFiltro, estadoFiltro, busqueda])
+  }, [inscripcionesIniciales, eventoFiltro, estadoFiltro, metodoFiltro, busqueda])
 
-  // Cálculos y Métricas del contexto
+  // Cálculos y Métricas desglosadas (Físico vs Bancos)
   const metricas = useMemo(() => {
     const total = inscripcionesFiltradas.length
     const pendientes = inscripcionesFiltradas.filter((i) => i.estado_pago === 'PENDIENTE')
@@ -109,12 +115,32 @@ export default function PanelProfesorCliente({
     const dineroPendiente = pendientes.reduce((acc, curr) => acc + curr.evento.precio, 0)
     const dineroRecaudado = pagadas.reduce((acc, curr) => acc + curr.montoPagado, 0)
 
+    // Recaudo Físico (Efectivo o registros anteriores nulos pagados)
+    const recaudoFisico = pagadas
+      .filter((i) => i.metodo_pago === 'EFECTIVO' || (!i.metodo_pago && i.estado_pago === 'PAGADO'))
+      .reduce((acc, curr) => acc + curr.montoPagado, 0)
+
+    // Recaudo en Bancos (Transferencias verificadas)
+    const recaudoBancos = pagadas
+      .filter((i) => i.metodo_pago === 'TRANSFERENCIA')
+      .reduce((acc, curr) => acc + curr.montoPagado, 0)
+
+    const efectivoCount = pagadas.filter(
+      (i) => i.metodo_pago === 'EFECTIVO' || (!i.metodo_pago && i.estado_pago === 'PAGADO')
+    ).length
+
+    const transferenciasCount = pagadas.filter((i) => i.metodo_pago === 'TRANSFERENCIA').length
+
     return {
       total,
       pendientesCount: pendientes.length,
       pagadasCount: pagadas.length,
       dineroPendiente,
       dineroRecaudado,
+      recaudoFisico,
+      recaudoBancos,
+      efectivoCount,
+      transferenciasCount,
     }
   }, [inscripcionesFiltradas])
 
@@ -158,58 +184,46 @@ export default function PanelProfesorCliente({
           </div>
           <button
             onClick={() => setToastMensaje(null)}
-            className="text-slate-400 hover:text-white text-xs"
+            className="text-slate-400 hover:text-white text-xs cursor-pointer"
           >
             &times;
           </button>
         </div>
       )}
 
-      {/* Barra Superior de Control de Sesión Docente */}
-      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-indigo-100/80 text-indigo-700 rounded-xl">
+      {/* Barra Superior de Identificación del Docente Autenticado */}
+      <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="p-3 bg-[#0B305B] text-white rounded-2xl shadow-sm border-t-2 border-[#D2202E]">
             <GraduationCap className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Sesión Activa - Rol Docente
-            </span>
             <div className="flex items-center gap-2">
-              <span className="font-extrabold text-slate-900 text-base">
-                {profesorActivo?.nombre || 'Docente'}
+              <span className="text-[10px] font-extrabold text-[#D2202E] uppercase tracking-wider">
+                Docente Titular Autenticado
               </span>
-              <span className="px-2 py-0.5 text-[10px] font-bold bg-indigo-50 text-indigo-700 rounded border border-indigo-200">
-                PROFESOR
+              <span className="px-2 py-0.5 text-[9px] font-black bg-emerald-50 text-emerald-700 rounded-md border border-emerald-200 uppercase">
+                {profesorActivo?.rol || 'PROFESOR'}
               </span>
             </div>
-            <p className="text-xs text-slate-500">
-              {profesorActivo?.carrera || 'Facultad de Ingenierías'} &bull; {profesorActivo?.email}
+            <h2 className="font-extrabold text-slate-900 text-lg leading-tight">
+              {profesorActivo?.nombre || 'Docente de la Facultad'}
+            </h2>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              {profesorActivo?.carrera || 'Facultad de Ciencias e Ingenierías'} &bull; <span className="text-slate-400">{profesorActivo?.email}</span>
             </p>
           </div>
         </div>
 
-        {/* Selector de Profesor para Pruebas Multiusuario */}
-        <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
-          <span className="text-xs font-semibold text-slate-600 whitespace-nowrap">
-            Simular Docente:
-          </span>
-          <select
-            value={profesorId}
-            onChange={(e) => setProfesorId(e.target.value)}
-            className="text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 outline-none"
-          >
-            {profesores.map((prof) => (
-              <option key={prof.id} value={prof.id}>
-                {prof.nombre} ({prof.carrera || 'Docente'})
-              </option>
-            ))}
-          </select>
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200 self-start sm:self-auto">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>Habilitado para validación de efectivo y transferencias</span>
         </div>
       </div>
 
-      {/* Métricas del Panel Docente */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Métricas Financieras Desglosadas del Panel Docente (KPIs) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Preinscritos */}
         <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase">Preinscritos</span>
@@ -221,49 +235,74 @@ export default function PanelProfesorCliente({
           <p className="text-xs text-slate-500 mt-1">Estudiantes en vista actual</p>
         </div>
 
+        {/* Por Recaudar */}
         <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase">Pagos Pendientes</span>
+            <span className="text-xs font-semibold text-slate-500 uppercase">Por Recaudar</span>
             <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
               <Clock className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-amber-600 mt-2">{metricas.pendientesCount}</p>
+          <p className="text-2xl font-bold text-amber-600 mt-2">
+            ${metricas.dineroPendiente.toLocaleString('es-CO')}
+          </p>
           <p className="text-xs text-slate-500 mt-1">
-            Por recaudar: ${metricas.dineroPendiente.toLocaleString('es-CO')} COP
+            {metricas.pendientesCount} pago(s) pendiente(s)
           </p>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm">
+        {/* Recaudo Físico (Efectivo) */}
+        <div className="bg-white p-5 rounded-xl border border-emerald-200/80 shadow-sm bg-gradient-to-br from-white to-emerald-50/20">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase">Pagos Completados</span>
-            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
-              <CheckCircle2 className="w-4 h-4" />
+            <span className="text-xs font-bold text-emerald-700 uppercase">Recaudo Físico</span>
+            <div className="p-2 bg-emerald-100 text-emerald-800 rounded-lg">
+              <Banknote className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-emerald-600 mt-2">{metricas.pagadasCount}</p>
-          <p className="text-xs text-slate-500 mt-1">
-            Recaudado: ${metricas.dineroRecaudado.toLocaleString('es-CO')} COP
+          <p className="text-2xl font-black text-emerald-800 mt-2">
+            ${metricas.recaudoFisico.toLocaleString('es-CO')}
+          </p>
+          <p className="text-xs text-emerald-600 font-medium mt-1">
+            {metricas.efectivoCount} pago(s) en efectivo
           </p>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm">
+        {/* Recaudo en Bancos (Transferencias) */}
+        <div className="bg-white p-5 rounded-xl border border-indigo-200/80 shadow-sm bg-gradient-to-br from-white to-indigo-50/20">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase">Recaudo Efectivo</span>
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+            <span className="text-xs font-bold text-indigo-700 uppercase">Recaudo en Bancos</span>
+            <div className="p-2 bg-indigo-100 text-indigo-800 rounded-lg">
+              <Landmark className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="text-2xl font-black text-indigo-800 mt-2">
+            ${metricas.recaudoBancos.toLocaleString('es-CO')}
+          </p>
+          <p className="text-xs text-indigo-600 font-medium mt-1">
+            {metricas.transferenciasCount} transferencia(s) CUS
+          </p>
+        </div>
+
+        {/* Total Consolidado */}
+        <div className="bg-white p-5 rounded-xl border border-[#0B305B]/30 shadow-sm bg-gradient-to-br from-white to-slate-50">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-[#0B305B] uppercase">Total Recaudado</span>
+            <div className="p-2 bg-[#0B305B] text-white rounded-lg">
               <HandCoins className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-indigo-700 mt-2">
-            ${metricas.dineroRecaudado.toLocaleString('es-CO')} COP
+          <p className="text-2xl font-black text-[#0B305B] mt-2">
+            ${metricas.dineroRecaudado.toLocaleString('es-CO')}
           </p>
-          <p className="text-xs text-slate-500 mt-1">Total en caja física</p>
+          <p className="text-xs text-slate-500 mt-1">
+            Físico + Bancos ({metricas.pagadasCount} total)
+          </p>
         </div>
       </div>
 
       {/* Barra de Filtros y Búsqueda */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Buscador de estudiante */}
           <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -307,6 +346,20 @@ export default function PanelProfesorCliente({
               <option value="EXENTO">Solo Exentos</option>
             </select>
           </div>
+
+          {/* Filtro de Método de Pago */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500 shrink-0">Método:</span>
+            <select
+              value={metodoFiltro}
+              onChange={(e) => setMetodoFiltro(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+            >
+              <option value="TODOS">Todos los Métodos</option>
+              <option value="EFECTIVO">Solo Efectivo</option>
+              <option value="TRANSFERENCIA">Solo Transferencia</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -319,7 +372,7 @@ export default function PanelProfesorCliente({
               Alumnos Preinscritos y Control de Recaudación
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Haga clic en <strong className="text-indigo-600 font-semibold">&apos;Registrar Pago&apos;</strong> para confirmar la recepción física del dinero en efectivo y completar la inscripción.
+              Haga clic en <strong className="text-[#0B305B] font-semibold">&apos;Registrar Pago&apos;</strong> para registrar pagos en efectivo o transferencias electrónicas.
             </p>
           </div>
           <span className="text-xs font-bold px-3 py-1 bg-white border border-slate-200 text-slate-700 rounded-lg self-start sm:self-auto shadow-sm">
@@ -334,7 +387,7 @@ export default function PanelProfesorCliente({
                 <th className="px-5 py-3.5">Estudiante</th>
                 <th className="px-5 py-3.5">Evento & Tarifa</th>
                 <th className="px-5 py-3.5">Asignatura Bonificación</th>
-                <th className="px-5 py-3.5">Responsable Recaudo</th>
+                <th className="px-5 py-3.5">Responsable & Método</th>
                 <th className="px-5 py-3.5">Estado Pago</th>
                 <th className="px-5 py-3.5 text-right">Acción Administrativa</th>
               </tr>
@@ -348,7 +401,7 @@ export default function PanelProfesorCliente({
                       No se encontraron alumnos preinscritos con los filtros actuales
                     </p>
                     <p className="text-xs mt-1">
-                      Intenta cambiar los filtros de búsqueda o seleccionar otro evento.
+                      Intenta cambiar los filtros de búsqueda o seleccionar otro evento o método de pago.
                     </p>
                   </td>
                 </tr>
@@ -356,6 +409,7 @@ export default function PanelProfesorCliente({
                 inscripcionesFiltradas.map((ins) => {
                   const esPendiente = ins.estado_pago === 'PENDIENTE'
                   const esPagado = ins.estado_pago === 'PAGADO'
+                  const esTransferencia = ins.metodo_pago === 'TRANSFERENCIA'
 
                   return (
                     <tr
@@ -397,14 +451,39 @@ export default function PanelProfesorCliente({
                         )}
                       </td>
 
-                      {/* Responsable Dinero */}
+                      {/* Responsable Dinero & Método de Pago (Badge con referencia) */}
                       <td className="px-5 py-4">
                         <div className="text-slate-800 font-medium">
                           {ins.profesor_responsable_dinero || 'Sin asignar'}
                         </div>
                         {ins.montoPagado > 0 && (
-                          <div className="text-[10px] text-emerald-600 font-semibold">
-                            Monto recibido: ${ins.montoPagado.toLocaleString('es-CO')} COP
+                          <div className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                            Monto: ${ins.montoPagado.toLocaleString('es-CO')} COP
+                          </div>
+                        )}
+
+                        {/* Insignia visual del Método de Pago */}
+                        {esPagado && (
+                          <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                            {esTransferencia ? (
+                              <span
+                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-2xs"
+                                title={ins.comprobanteUrl || 'Transferencia bancaria'}
+                              >
+                                <Landmark className="w-3 h-3 text-indigo-600 shrink-0" />
+                                <span>Transferencia</span>
+                                {ins.comprobanteUrl && (
+                                  <span className="font-mono text-[9px] text-indigo-900 font-semibold max-w-[120px] truncate">
+                                    {ins.comprobanteUrl.replace('TRANSFERENCIA [', '').replace(']', '')}
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                                <Banknote className="w-3 h-3 text-emerald-600 shrink-0" />
+                                <span>Efectivo</span>
+                              </span>
+                            )}
                           </div>
                         )}
                       </td>
@@ -451,15 +530,13 @@ export default function PanelProfesorCliente({
                               onClick={() => handleRevertirPago(ins.id)}
                               disabled={loadingRevertir === ins.id}
                               title="Revertir a pendiente en caso de error"
-                              className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                              className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                             >
                               <RotateCcw className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         ) : (
-                          <span className="text-[11px] text-slate-400 font-medium">
-                            No requiere recaudo
-                          </span>
+                          <span className="text-slate-400 text-xs italic">Exento de pago</span>
                         )}
                       </td>
                     </tr>
@@ -471,10 +548,13 @@ export default function PanelProfesorCliente({
         </div>
       </div>
 
-      {/* Modal de Registro de Pago en Efectivo */}
+      {/* Modal para Registrar Pago */}
       <ModalRegistrarPago
         isOpen={modalAbierto}
-        onClose={() => setModalAbierto(false)}
+        onClose={() => {
+          setModalAbierto(false)
+          setInscripcionSeleccionada(null)
+        }}
         inscripcion={inscripcionSeleccionada}
         profesorActivoNombre={profesorActivo?.nombre || 'Docente'}
         onPagoCompletado={handlePagoCompletado}
@@ -482,4 +562,3 @@ export default function PanelProfesorCliente({
     </div>
   )
 }
-

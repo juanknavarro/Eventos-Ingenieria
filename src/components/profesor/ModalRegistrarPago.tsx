@@ -3,23 +3,25 @@
 import React, { useState, useEffect } from 'react'
 import {
   X,
-  DollarSign,
   AlertCircle,
   CheckCircle2,
   BookOpen,
   User,
   Calendar,
-  ShieldAlert,
   Loader2,
   HandCoins,
+  Banknote,
+  Landmark,
 } from 'lucide-react'
-import { registrarPagoEfectivo } from '@/actions/pagos'
+import { registrarPago, TipoMetodoPago } from '@/actions/pagos'
 
 export interface InscripcionData {
   id: string
   asignatura_bonificacion: string | null
   profesor_responsable_dinero: string | null
   estado_pago: string
+  metodo_pago?: string | null
+  comprobanteUrl?: string | null
   montoPagado: number
   evento: {
     id: string
@@ -51,6 +53,8 @@ export default function ModalRegistrarPago({
   profesorActivoNombre,
   onPagoCompletado,
 }: ModalRegistrarPagoProps) {
+  const [metodoPago, setMetodoPago] = useState<TipoMetodoPago>('EFECTIVO')
+  const [numeroReferencia, setNumeroReferencia] = useState<string>('')
   const [monto, setMonto] = useState<number>(0)
   const [observaciones, setObservaciones] = useState<string>('')
   const [confirmado, setConfirmado] = useState<boolean>(false)
@@ -60,6 +64,8 @@ export default function ModalRegistrarPago({
   useEffect(() => {
     if (inscripcion) {
       setMonto(inscripcion.evento.precio)
+      setMetodoPago('EFECTIVO')
+      setNumeroReferencia('')
       setObservaciones('')
       setConfirmado(false)
       setErrorMsg(null)
@@ -83,8 +89,18 @@ export default function ModalRegistrarPago({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (metodoPago === 'TRANSFERENCIA' && !numeroReferencia.trim()) {
+      setErrorMsg('Debes ingresar el número de referencia o CUS de la transferencia bancaria.')
+      return
+    }
+
     if (!confirmado) {
-      setErrorMsg('Debes marcar la casilla confirmando que recibiste el dinero en efectivo.')
+      setErrorMsg(
+        metodoPago === 'EFECTIVO'
+          ? 'Debes marcar la casilla confirmando que recibiste el dinero en efectivo.'
+          : 'Debes marcar la casilla confirmando que verificaste el comprobante de transferencia bancaria.'
+      )
       return
     }
 
@@ -97,9 +113,11 @@ export default function ModalRegistrarPago({
     setErrorMsg(null)
 
     try {
-      const result = await registrarPagoEfectivo({
+      const result = await registrarPago({
         inscripcionId: inscripcion.id,
         montoRecibido: Number(monto),
+        metodoPago,
+        numeroReferencia: numeroReferencia.trim() || undefined,
         profesorNombre: profesorActivoNombre,
         observaciones: observaciones.trim() || undefined,
       })
@@ -121,33 +139,34 @@ export default function ModalRegistrarPago({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200">
       {/* Contenedor del Modal */}
       <div
-        className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all animate-in zoom-in-95 duration-200"
+        className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all animate-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col"
         role="dialog"
         aria-modal="true"
       >
         {/* Header del Modal Unisinú */}
-        <div className="bg-[#0B305B] px-6 py-4 text-white flex items-center justify-between border-b-2 border-[#D2202E]">
+        <div className="bg-[#0B305B] px-6 py-4 text-white flex items-center justify-between border-b-2 border-[#D2202E] shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm border border-white/20">
               <HandCoins className="w-5 h-5 text-[#F6CDD1]" />
             </div>
             <div>
-              <h3 className="font-extrabold text-base">Registrar Pago en Efectivo</h3>
+              <h3 className="font-extrabold text-base">Registrar Pago de Inscripción</h3>
               <p className="text-xs text-slate-300">
                 Universidad del Sinú &bull; Control Docente de Recaudo
               </p>
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             disabled={loading}
-            className="text-white/70 hover:text-white hover:bg-white/10 p-1.5 rounded-lg transition-colors"
+            className="text-white/70 hover:text-white hover:bg-white/10 p-1.5 rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
           {errorMsg && (
             <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2.5 text-rose-800 text-xs animate-in shake">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
@@ -193,10 +212,77 @@ export default function ModalRegistrarPago({
             </div>
           </div>
 
+          {/* Selector Interactivo de Método de Pago */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-700">
+              Método de Pago
+            </label>
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setMetodoPago('EFECTIVO')
+                  setConfirmado(false)
+                }}
+                className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                  metodoPago === 'EFECTIVO'
+                    ? 'bg-[#0B305B] text-white border-[#0B305B] shadow-sm'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <Banknote className="w-4 h-4" />
+                <span>Efectivo</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMetodoPago('TRANSFERENCIA')
+                  setConfirmado(false)
+                }}
+                className={`flex items-center justify-center gap-2 p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                  metodoPago === 'TRANSFERENCIA'
+                    ? 'bg-[#0B305B] text-white border-[#0B305B] shadow-sm'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <Landmark className="w-4 h-4" />
+                <span>Transferencia Bancaria</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Campo Obligatorio de Número de Referencia (CUS) para Transferencias */}
+          {metodoPago === 'TRANSFERENCIA' && (
+            <div className="space-y-1.5 bg-indigo-50/50 p-3.5 rounded-xl border border-indigo-100 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-800">
+                  Número de Referencia / CUS <span className="text-[#D2202E]">*</span>
+                </label>
+                <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded">
+                  Obligatorio
+                </span>
+              </div>
+              <input
+                type="text"
+                placeholder="Ej. CUS 98452174 (Nequi, Bancolombia, Daviplata, PSE)"
+                value={numeroReferencia}
+                onChange={(e) => setNumeroReferencia(e.target.value)}
+                required
+                className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none transition"
+              />
+              <p className="text-[10px] text-slate-500">
+                Registra el código único de seguimiento (CUS) o número de recibo bancario aportado por el estudiante.
+              </p>
+            </div>
+          )}
+
           {/* Campo de Monto Recibido */}
           <div className="space-y-1.5">
             <label className="block text-xs font-bold text-slate-700">
-              Monto en Efectivo Recibido (COP)
+              {metodoPago === 'EFECTIVO'
+                ? 'Monto en Efectivo Recibido (COP)'
+                : 'Monto de Transferencia Verificado (COP)'}
             </label>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 pointer-events-none font-bold text-sm">
@@ -213,25 +299,25 @@ export default function ModalRegistrarPago({
               />
             </div>
             <p className="text-[11px] text-slate-500">
-              Valor estándar del evento: ${inscripcion.evento.precio.toLocaleString('es-CO')} COP
+              Tarifa establecida del evento: ${inscripcion.evento.precio.toLocaleString('es-CO')} COP
             </p>
           </div>
 
           {/* Nota o Folio Opcional */}
           <div className="space-y-1.5">
             <label className="block text-xs font-semibold text-slate-700">
-              Nota / Referencia de Recibo (Opcional)
+              Nota / Observaciones Adicionales (Opcional)
             </label>
             <input
               type="text"
-              placeholder="Ej. Recibido en oficina 402 - Recibo # 045"
+              placeholder="Ej. Recibido en oficina de coordinación / Verificado en extracto"
               value={observaciones}
               onChange={(e) => setObservaciones(e.target.value)}
               className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none transition"
             />
           </div>
 
-          {/* Casilla de Confirmación Jurada */}
+          {/* Casilla de Confirmación Jurada Dinámica */}
           <div className="p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-xl">
             <label className="flex items-start gap-2.5 cursor-pointer select-none">
               <input
@@ -241,7 +327,15 @@ export default function ModalRegistrarPago({
                 className="mt-0.5 h-4 w-4 rounded border-amber-300 text-indigo-600 focus:ring-indigo-500"
               />
               <span className="text-xs text-amber-950 font-medium leading-tight">
-                Confirmo bajo mi rol docente (<strong>{profesorActivoNombre}</strong>) que he recibido física y efectivamente el valor de <strong>${monto.toLocaleString('es-CO')} COP</strong> por parte del estudiante.
+                {metodoPago === 'EFECTIVO' ? (
+                  <>
+                    Confirmo bajo mi rol docente (<strong>{profesorActivoNombre}</strong>) que he recibido física y efectivamente el valor de <strong>${monto.toLocaleString('es-CO')} COP</strong> en efectivo por parte del estudiante.
+                  </>
+                ) : (
+                  <>
+                    Confirmo bajo mi rol docente (<strong>{profesorActivoNombre}</strong>) que he verificado y validado el comprobante de transferencia bancaria por <strong>${monto.toLocaleString('es-CO')} COP</strong> {numeroReferencia.trim() ? <>(Ref: <strong>{numeroReferencia.trim()}</strong>)</> : ''}.
+                  </>
+                )}
               </span>
             </label>
           </div>
@@ -252,13 +346,13 @@ export default function ModalRegistrarPago({
               type="button"
               onClick={onClose}
               disabled={loading}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
+              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              disabled={loading || !confirmado}
+              disabled={loading || !confirmado || (metodoPago === 'TRANSFERENCIA' && !numeroReferencia.trim())}
               className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white bg-[#D2202E] hover:bg-[#B01824] disabled:bg-slate-300 disabled:cursor-not-allowed rounded-xl shadow-md shadow-[#D2202E]/20 transition-all cursor-pointer"
             >
               {loading ? (
@@ -279,4 +373,3 @@ export default function ModalRegistrarPago({
     </div>
   )
 }
-

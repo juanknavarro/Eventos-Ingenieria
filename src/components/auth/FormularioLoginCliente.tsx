@@ -8,6 +8,8 @@ import {
   ShieldAlert,
   ArrowRight,
   Loader2,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import { iniciarSesionConCredenciales } from '@/actions/auth'
 
@@ -20,6 +22,7 @@ export default function FormularioLoginCliente() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [mostrarPassword, setMostrarPassword] = useState(false)
   const [cargando, setCargando] = useState(false)
   const [errorLocal, setErrorLocal] = useState<string | null>(null)
 
@@ -44,13 +47,21 @@ export default function FormularioLoginCliente() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!email) return
+    const emailLimpio = email.trim()
+    if (!emailLimpio) {
+      setErrorLocal('Por favor ingresa tu correo institucional.')
+      return
+    }
+    if (!password) {
+      setErrorLocal('Por favor ingresa tu contraseña.')
+      return
+    }
 
     setCargando(true)
     setErrorLocal(null)
 
     const formData = new FormData()
-    formData.append('email', email)
+    formData.append('email', emailLimpio)
     formData.append('password', password)
     if (redirectParam) formData.append('redirect', redirectParam)
 
@@ -112,21 +123,34 @@ export default function FormularioLoginCliente() {
           <div className="relative">
             <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
-              type="password"
+              type={mostrarPassword ? 'text' : 'password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••••••"
               required
               autoComplete="current-password"
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-semibold text-slate-900 outline-none transition"
+              className="w-full pl-10 pr-11 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-semibold text-slate-900 outline-none transition"
             />
+            <button
+              type="button"
+              onClick={() => setMostrarPassword(!mostrarPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0B305B] p-1 rounded-lg transition-colors cursor-pointer focus:outline-none"
+              title={mostrarPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+              aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+            >
+              {mostrarPassword ? (
+                <EyeOff className="w-4 h-4" />
+              ) : (
+                <Eye className="w-4 h-4" />
+              )}
+            </button>
           </div>
         </div>
 
         <button
           type="submit"
-          disabled={cargando || !email.trim()}
-          className="w-full py-3 px-4 bg-[#0B305B] hover:bg-[#071F3B] disabled:bg-slate-300 text-white font-bold text-xs rounded-xl shadow-md shadow-[#0B305B]/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+          disabled={cargando}
+          className="w-full py-3 px-4 bg-[#0B305B] hover:bg-[#071F3B] disabled:bg-slate-400 text-white font-bold text-xs rounded-xl shadow-md shadow-[#0B305B]/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
         >
           {cargando ? (
             <>

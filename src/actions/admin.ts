@@ -130,6 +130,13 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
     let imagenCentralUrl = (formData.get('imagen_central_url') as string) || null
     let sponsorsUrl = (formData.get('sponsors_url') as string) || null
 
+    let certificadoPlantillaUrl = (formData.get('certificado_plantilla_url') as string)?.trim() || null
+    const horasAcademicasStr = formData.get('horas_academicas') as string
+    const horasAcademicas = horasAcademicasStr ? parseInt(horasAcademicasStr, 10) : 4
+    let firmaDirectorUrl = (formData.get('firma_director_url') as string)?.trim() || null
+    const nombreFirmante2 = (formData.get('nombre_firmante_2') as string)?.trim() || null
+    const cargoFirmante2 = (formData.get('cargo_firmante_2') as string)?.trim() || null
+
     if (!titulo || !descripcion || !fechaInicioStr || !ubicacion) {
       return { success: false, error: 'Por favor completa todos los campos requeridos.' }
     }
@@ -161,6 +168,24 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
       }
     }
 
+    // 4. Procesar archivo de Plantilla de Certificado si fue subido
+    const archivoCertificado = formData.get('archivo_certificado_plantilla') as File | null
+    if (archivoCertificado && archivoCertificado.size > 0) {
+      const subida = await subirArchivoRecursosEventos(archivoCertificado, 'certificado')
+      if (subida.url) {
+        certificadoPlantillaUrl = subida.url
+      }
+    }
+
+    // 5. Procesar archivo de Firma de Director/Organizador si fue subido
+    const archivoFirmaDirector = formData.get('archivo_firma_director') as File | null
+    if (archivoFirmaDirector && archivoFirmaDirector.size > 0) {
+      const subida = await subirArchivoRecursosEventos(archivoFirmaDirector, 'firma_director')
+      if (subida.url) {
+        firmaDirectorUrl = subida.url
+      }
+    }
+
     let programaAcademico =
       (formData.get('programa_academico') as string)?.trim() || 'Facultad de Ingenierías'
     if (session.rol !== RolUsuario.SUPER_ADMIN && session.carrera) {
@@ -182,9 +207,14 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
         logo_universidad_url: '/imagen_2.png',
         imagen_central_url: imagenCentralUrl,
         sponsors_url: sponsorsUrl,
+        certificado_plantilla_url: certificadoPlantillaUrl,
+        horas_academicas: horasAcademicas,
+        firma_director_url: firmaDirectorUrl,
+        nombre_firmante_2: nombreFirmante2,
+        cargo_firmante_2: cargoFirmante2,
         programa_academico: programaAcademico,
         organizadorId: session?.id || '',
-      },
+      } as any,
     })
 
     revalidatePath('/admin')
@@ -222,6 +252,13 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
     let logoFondoUrl = (formData.get('logo_fondo_url') as string) || null
     let imagenCentralUrl = (formData.get('imagen_central_url') as string) || null
     let sponsorsUrl = (formData.get('sponsors_url') as string) || null
+
+    let certificadoPlantillaUrl = (formData.get('certificado_plantilla_url') as string)?.trim() || null
+    const horasAcademicasStr = formData.get('horas_academicas') as string
+    const horasAcademicas = horasAcademicasStr ? parseInt(horasAcademicasStr, 10) : 4
+    let firmaDirectorUrl = (formData.get('firma_director_url') as string)?.trim() || null
+    const nombreFirmante2 = (formData.get('nombre_firmante_2') as string)?.trim() || null
+    const cargoFirmante2 = (formData.get('cargo_firmante_2') as string)?.trim() || null
 
     if (!eventoId || !titulo || !descripcion) {
       return { success: false, error: 'Identificador o campos obligatorios faltantes.' }
@@ -272,6 +309,24 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
       }
     }
 
+    // 4. Procesar archivo de Plantilla de Certificado si fue subido
+    const archivoCertificado = formData.get('archivo_certificado_plantilla') as File | null
+    if (archivoCertificado && archivoCertificado.size > 0) {
+      const subida = await subirArchivoRecursosEventos(archivoCertificado, 'certificado')
+      if (subida.url) {
+        certificadoPlantillaUrl = subida.url
+      }
+    }
+
+    // 5. Procesar archivo de Firma de Director/Organizador si fue subido
+    const archivoFirmaDirector = formData.get('archivo_firma_director') as File | null
+    if (archivoFirmaDirector && archivoFirmaDirector.size > 0) {
+      const subida = await subirArchivoRecursosEventos(archivoFirmaDirector, 'firma_director')
+      if (subida.url) {
+        firmaDirectorUrl = subida.url
+      }
+    }
+
     await prisma.evento.update({
       where: { id: eventoId },
       data: {
@@ -287,7 +342,12 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
         logo_fondo_url: logoFondoUrl,
         imagen_central_url: imagenCentralUrl,
         sponsors_url: sponsorsUrl,
-      },
+        certificado_plantilla_url: certificadoPlantillaUrl,
+        horas_academicas: horasAcademicas,
+        firma_director_url: firmaDirectorUrl,
+        nombre_firmante_2: nombreFirmante2,
+        cargo_firmante_2: cargoFirmante2,
+      } as any,
     })
 
     revalidatePath('/admin')

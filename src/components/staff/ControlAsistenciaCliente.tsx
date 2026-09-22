@@ -66,19 +66,28 @@ export interface AsistenciaHistorial {
 
 interface ControlAsistenciaClienteProps {
   eventos: EventoOption[]
-  staffList: StaffUsuario[]
+  staffList?: StaffUsuario[]
   historialInicial: AsistenciaHistorial[]
+  staffActual?: {
+    id: string
+    nombre: string
+    email: string
+    rol: string
+  }
 }
 
 export default function ControlAsistenciaCliente({
   eventos,
-  staffList,
+  staffList = [],
   historialInicial,
+  staffActual,
 }: ControlAsistenciaClienteProps) {
   // Evento activo
   const [eventoId, setEventoId] = useState<string>(eventos[0]?.id || '')
-  // Staff activo en puerta
-  const [staffId, setStaffId] = useState<string>(staffList[0]?.id || '')
+  
+  // Operador de turno autenticado
+  const operador = staffActual || staffList[0]
+  const staffId = operador?.id || ''
 
   // Documento / Cédula / Código escaneado
   const [documentoInput, setDocumentoInput] = useState<string>('')
@@ -157,30 +166,14 @@ export default function ControlAsistenciaCliente({
     [sonidoHabilitado]
   )
 
-  // Asegurar autofoco al montar y mantener el foco continuo
+  // Asegurar autofoco en el campo de escaneo al cargar el módulo
   useEffect(() => {
     inputRef.current?.focus()
-
-    const handleClickGlobal = (e: MouseEvent) => {
-      // Si el clic no fue dentro de un selector <select> o botón, re-enfocar el lector
-      const target = e.target as HTMLElement
-      if (
-        target.tagName !== 'SELECT' &&
-        target.tagName !== 'BUTTON' &&
-        target.tagName !== 'A' &&
-        target.tagName !== 'INPUT'
-      ) {
-        inputRef.current?.focus()
-      }
-    }
-
-    window.addEventListener('click', handleClickGlobal)
-    return () => window.removeEventListener('click', handleClickGlobal)
   }, [])
 
   // Evento activo actual
   const eventoSeleccionado = eventos.find((e) => e.id === eventoId)
-  const staffSeleccionado = staffList.find((s) => s.id === staffId)
+  const staffSeleccionado = operador
 
   // Asistencias registradas para el evento actual
   const asistenciasDelEvento = historial.filter(
@@ -252,15 +245,6 @@ export default function ControlAsistenciaCliente({
     }
   }
 
-  // Atajos rápidos para pruebas manuales con clics
-  const escanearCodigoPrueba = (codigo: string) => {
-    setDocumentoInput(codigo)
-    setTimeout(() => {
-      const fakeEvent = { preventDefault: () => {} } as React.FormEvent
-      setDocumentoInput(codigo)
-      inputRef.current?.focus()
-    }, 10)
-  }
 
   return (
     <div className="space-y-6">
@@ -277,13 +261,13 @@ export default function ControlAsistenciaCliente({
             </span>
             <div className="mt-0.5">
               <select
+                id="select-evento-asistencia"
                 value={eventoId}
                 onChange={(e) => {
                   setEventoId(e.target.value)
                   setUltimoResultado(null)
-                  inputRef.current?.focus()
                 }}
-                className="text-sm font-extrabold text-slate-900 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl px-3 py-1.5 focus:ring-2 focus:ring-emerald-500 outline-none transition"
+                className="text-sm font-extrabold text-slate-900 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl px-3.5 py-2 focus:ring-2 focus:ring-emerald-500 outline-none transition cursor-pointer"
               >
                 {eventos.map((ev) => (
                   <option key={ev.id} value={ev.id}>
@@ -297,33 +281,18 @@ export default function ControlAsistenciaCliente({
 
         {/* Controles de Operador Staff y Audio */}
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Selector de Staff */}
-          <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
-            <span className="text-xs font-semibold text-slate-600">Operador:</span>
-            <select
-              value={staffId}
-              onChange={(e) => {
-                setStaffId(e.target.value)
-                inputRef.current?.focus()
-              }}
-              className="text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-lg px-2.5 py-1 focus:ring-2 focus:ring-emerald-500 outline-none"
-            >
-              {staffList.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nombre} (Staff)
-                </option>
-              ))}
-            </select>
+          {/* Indicador de Operador Autenticado */}
+          <div className="flex items-center gap-2 bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200 text-xs">
+            <User className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+            <span className="text-slate-500 font-semibold">Operador:</span>
+            <span className="font-extrabold text-slate-900">{operador?.nombre || 'Staff de Turno'}</span>
           </div>
 
           {/* Toggle Sonido */}
           <button
             type="button"
-            onClick={() => {
-              setSonidoHabilitado(!sonidoHabilitado)
-              inputRef.current?.focus()
-            }}
-            className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition ${
+            onClick={() => setSonidoHabilitado(!sonidoHabilitado)}
+            className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
               sonidoHabilitado
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
                 : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'
@@ -342,8 +311,11 @@ export default function ControlAsistenciaCliente({
         </div>
       </div>
 
-      {/* Tarjeta Gigante de Entrada del Lector de Código de Barras (Autofocus Permanente) */}
-      <section className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-800 relative overflow-hidden">
+      {/* Tarjeta Gigante de Entrada del Lector de Código de Barras */}
+      <section
+        onClick={() => inputRef.current?.focus()}
+        className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-800 relative overflow-hidden cursor-pointer"
+      >
         <div className="max-w-3xl mx-auto text-center space-y-4 relative z-10">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-xs font-bold tracking-wide">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
@@ -369,10 +341,6 @@ export default function ControlAsistenciaCliente({
                 type="text"
                 value={documentoInput}
                 onChange={(e) => setDocumentoInput(e.target.value)}
-                onBlur={() => {
-                  // Re-enfocar automáticamente tras un pequeño delay
-                  setTimeout(() => inputRef.current?.focus(), 150)
-                }}
                 autoFocus
                 autoComplete="off"
                 placeholder="Esperando código de barras o cédula..."
@@ -388,50 +356,6 @@ export default function ControlAsistenciaCliente({
             </div>
           </form>
 
-          {/* Acceso Rápido / Pruebas sin escáner físico */}
-          <div className="pt-2 flex items-center justify-center gap-2 flex-wrap text-[11px] text-slate-400">
-            <span className="font-semibold text-slate-300">Pruebas rápidas:</span>
-            <button
-              type="button"
-              onClick={() => {
-                setDocumentoInput('20221015001')
-                setTimeout(() => inputRef.current?.focus(), 50)
-              }}
-              className="px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-emerald-300 border border-emerald-500/30 transition cursor-pointer"
-            >
-              20221015001 (Mateo - Pagado)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setDocumentoInput('20231015042')
-                setTimeout(() => inputRef.current?.focus(), 50)
-              }}
-              className="px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-rose-300 border border-rose-500/30 transition cursor-pointer"
-            >
-              20231015042 (Sofía - Pendiente)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setDocumentoInput('20212015099')
-                setTimeout(() => inputRef.current?.focus(), 50)
-              }}
-              className="px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-blue-300 border border-blue-500/30 transition cursor-pointer"
-            >
-              20212015099 (Lucas - Exento)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setDocumentoInput('999999999')
-                setTimeout(() => inputRef.current?.focus(), 50)
-              }}
-              className="px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-slate-300 border border-slate-600 transition cursor-pointer"
-            >
-              999999999 (Inexistente)
-            </button>
-          </div>
         </div>
       </section>
 

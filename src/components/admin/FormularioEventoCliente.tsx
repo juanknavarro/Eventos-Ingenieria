@@ -18,6 +18,7 @@ import {
   Sparkles,
   Info,
   GraduationCap,
+  Award,
 } from 'lucide-react'
 import { EstadoEvento } from '@prisma/client'
 import { crearEvento, actualizarEvento } from '@/actions/admin'
@@ -37,6 +38,11 @@ interface EventoInicial {
   logo_fondo_url: string | null
   imagen_central_url: string | null
   sponsors_url: string | null
+  certificado_plantilla_url?: string | null
+  horas_academicas?: number | null
+  firma_director_url?: string | null
+  nombre_firmante_2?: string | null
+  cargo_firmante_2?: string | null
   programa_academico?: string | null
 }
 
@@ -373,6 +379,92 @@ export default function FormularioEventoCliente({
                 <li>Almacenamiento: Bucket público <strong>recursos_eventos</strong> en Supabase.</li>
                 <li>Se genera automáticamente el código de barras <strong>Code-128</strong> para escáner físico.</li>
               </ul>
+            </div>
+          </div>
+
+          {/* ========================================================================= */}
+          {/* SECCIÓN: PLANTILLA DE CERTIFICADO DIGITAL Y METADATOS EN PDF              */}
+          {/* ========================================================================= */}
+          <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-sm space-y-5 border-t-4 border-[#D2202E]">
+            <div className="border-b border-slate-100 pb-3">
+              <h2 className="text-base font-bold text-[#0B305B] flex items-center gap-2">
+                <Award className="w-5 h-5 text-[#D2202E]" />
+                Certificación Oficial en PDF (Diplomas)
+              </h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Configura la imagen de fondo institucional (A4 horizontal) e intensidad horaria para la generación dinámica con pdf-lib.
+              </p>
+            </div>
+
+            {/* Plantilla de Fondo del Certificado */}
+            <SelectorRecursoGrafico
+              etiqueta="Lienzo / Imagen de Fondo del Diploma"
+              descripcion="Plantilla gráfica oficial en alta resolución (PNG o JPG) sobre la cual se estamparán el nombre del alumno, cédula y código QR."
+              nombreCampoUrl="certificado_plantilla_url"
+              nombreCampoArchivo="archivo_certificado_plantilla"
+              valorInicialUrl={eventoInicial?.certificado_plantilla_url}
+              aspectoRecomendado="Horizontal A4 (842 x 595 px / 1.41:1)"
+            />
+
+            {/* Intensidad Horaria */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-[#0B305B]" />
+                  Intensidad Horaria Certificada (Horas) *
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">horas_academicas</span>
+              </label>
+              <input
+                type="number"
+                name="horas_academicas"
+                min="1"
+                max="500"
+                defaultValue={eventoInicial?.horas_academicas || 4}
+                required
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-bold text-slate-800 outline-none transition"
+              />
+              <span className="text-[10px] text-slate-400">
+                Horas académicas que se imprimirán en el certificado (ej. 4, 8, 20 horas).
+              </span>
+            </div>
+
+            {/* Segundo Firmante (Opcional - Director de Programa o Coordinador) */}
+            <div className="pt-2 border-t border-slate-100 space-y-3">
+              <span className="text-xs font-bold text-slate-700 block">
+                Segundo Firmante Institucional (Opcional)
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-slate-600">Nombre del Firmante</label>
+                  <input
+                    type="text"
+                    name="nombre_firmante_2"
+                    defaultValue={eventoInicial?.nombre_firmante_2 || ''}
+                    placeholder="Ej. Ing. Carlos Mendoza"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-[#0B305B]"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-slate-600">Cargo del Firmante</label>
+                  <input
+                    type="text"
+                    name="cargo_firmante_2"
+                    defaultValue={eventoInicial?.cargo_firmante_2 || ''}
+                    placeholder="Ej. Director de Programa"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-[#0B305B]"
+                  />
+                </div>
+              </div>
+
+              <SelectorRecursoGrafico
+                etiqueta="Firma Digital Escaneada (Segundo Firmante)"
+                descripcion="Firma con fondo transparente PNG del docente u organizador (opcional)."
+                nombreCampoUrl="firma_director_url"
+                nombreCampoArchivo="archivo_firma_director"
+                valorInicialUrl={eventoInicial?.firma_director_url}
+                aspectoRecomendado="Firma Horizontal (3:1 o 4:1)"
+              />
             </div>
           </div>
 

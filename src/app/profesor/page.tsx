@@ -28,27 +28,8 @@ export default async function ProfesorAdminPage() {
 
   const filtroEventos = filtroEventosPorTenancy(sesion)
   const filtroInscripciones = filtroInscripcionesPorTenancy(sesion)
-  const filtroProfesores =
-    sesion.rol === RolUsuario.SUPER_ADMIN || !sesion.carrera
-      ? { rol: RolUsuario.PROFESOR }
-      : {
-          rol: RolUsuario.PROFESOR,
-          carrera: { contains: sesion.carrera, mode: 'insensitive' as const },
-        }
 
-  const [profesores, eventos, inscripcionesRaw] = await Promise.all([
-    // Consultar profesores del sistema filtrados por programa
-    prisma.usuario.findMany({
-      where: filtroProfesores,
-      select: {
-        id: true,
-        nombre: true,
-        email: true,
-        rol: true,
-        carrera: true,
-      },
-      orderBy: { nombre: 'asc' },
-    }),
+  const [eventos, inscripcionesRaw] = await Promise.all([
     // Consultar eventos filtrados por programa
     prisma.evento.findMany({
       where: filtroEventos,
@@ -89,7 +70,7 @@ export default async function ProfesorAdminPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200/40">
       {/* Header del Panel Docente Unisinú */}
-      <header className="border-b-2 border-[#D2202E]/30 bg-white/95 backdrop-blur-md sticky top-0 z-40 shadow-sm">
+      <header className="border-b-2 border-[#D2202E]/30 bg-white sticky top-0 z-40 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link
@@ -160,7 +141,13 @@ export default async function ProfesorAdminPage() {
       {/* Contenido Principal */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <PanelProfesorCliente
-          profesores={profesores}
+          docenteActual={{
+            id: sesion.id,
+            nombre: sesion.nombre,
+            email: sesion.email,
+            rol: sesion.rol,
+            carrera: sesion.carrera,
+          }}
           eventos={eventos}
           inscripcionesIniciales={inscripcionesRaw}
         />

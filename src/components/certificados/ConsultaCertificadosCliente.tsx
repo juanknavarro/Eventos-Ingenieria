@@ -20,13 +20,47 @@ import {
 import {
   consultarCertificadosEstudiante,
   ConsultaEstudianteResultado,
+  EventoAsistidoItem,
 } from '@/actions/certificados'
+import { descargarCertificadoPdf } from '@/lib/pdf/generador'
 
 export default function ConsultaCertificadosCliente() {
   const [documento, setDocumento] = useState<string>('')
   const [cargando, setCargando] = useState<boolean>(false)
+  const [descargandoId, setDescargandoId] = useState<string | null>(null)
   const [resultado, setResultado] = useState<ConsultaEstudianteResultado | null>(null)
   const [autoDescargaIniciada, setAutoDescargaIniciada] = useState<boolean>(false)
+
+  const handleDescargarCertificado = async (
+    item: EventoAsistidoItem,
+    usuario?: ConsultaEstudianteResultado['usuario'],
+    configGlobal?: ConsultaEstudianteResultado['configuracionGlobal']
+  ) => {
+    try {
+      setDescargandoId(item.asistenciaId)
+      await descargarCertificadoPdf({
+        alumnoNombre: usuario?.nombre || 'Estudiante',
+        alumnoDocumento: usuario?.codigoEstudiantil || usuario?.id || 'N/A',
+        alumnoCarrera: usuario?.carrera,
+        eventoTitulo: item.eventoTitulo,
+        horasAcademicas: item.horasAcademicas || configGlobal?.horasAcademicasDefault || 4,
+        fechaEvento: item.eventoFecha,
+        fondoUrl: item.certificadoPlantillaUrl || configGlobal?.plantillaFondoDefaultUrl || '/imagen_2.png',
+        firmaDecanoUrl: configGlobal?.firmaDecanoUrl || null,
+        nombreDecano: configGlobal?.nombreDecano || 'Ing. Roberto Gómez',
+        cargoDecano: configGlobal?.cargoFirmante || 'Decano Facultad de Ciencias e Ingenierías',
+        firmaDirectorUrl: item.firmaDirectorUrl || null,
+        nombreFirmante2: item.nombreFirmante2 || null,
+        cargoFirmante2: item.cargoFirmante2 || null,
+        asistenciaId: item.asistenciaId,
+      })
+    } catch (err) {
+      console.error('Error generando certificado PDF:', err)
+      alert('Ocurrió un error al generar el certificado PDF en tu navegador.')
+    } finally {
+      setDescargandoId(null)
+    }
+  }
 
   const handleBuscar = async (docConsultar?: string) => {
     const valor = (docConsultar ?? documento).trim()
@@ -44,15 +78,7 @@ export default function ConsultaCertificadosCliente() {
       if (res.success && res.eventosAsistidos.length > 0) {
         setAutoDescargaIniciada(true)
         const primerCertificado = res.eventosAsistidos[0]
-        // Abrir en nueva pestaña o iniciar descarga del PDF
-        const url = `/api/certificado/${primerCertificado.asistenciaId}`
-        const link = document.createElement('a')
-        link.href = url
-        link.target = '_blank'
-        link.download = `Certificado_${res.usuario?.codigoEstudiantil || 'Asistencia'}.pdf`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
+        await handleDescargarCertificado(primerCertificado, res.usuario, res.configuracionGlobal)
       }
     } catch {
       setResultado({
@@ -69,11 +95,6 @@ export default function ConsultaCertificadosCliente() {
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     handleBuscar()
-  }
-
-  const pruebaRapida = (codigo: string) => {
-    setDocumento(codigo)
-    handleBuscar(codigo)
   }
 
   return (
@@ -123,32 +144,6 @@ export default function ConsultaCertificadosCliente() {
                   Consultar
                 </>
               )}
-            </button>
-          </div>
-
-          {/* Atajos de prueba */}
-          <div className="flex items-center justify-center gap-2 flex-wrap text-[11px] text-slate-400 pt-1">
-            <span className="font-semibold text-slate-500">Pruebas con datos del sistema:</span>
-            <button
-              type="button"
-              onClick={() => pruebaRapida('20221015001')}
-              className="px-2.5 py-1 bg-[#F0F4F9] hover:bg-[#E1E9F3] text-[#0B305B] rounded-lg border border-[#C2D3E7] font-bold transition cursor-pointer"
-            >
-              20221015001 (Mateo - 2 Certificados)
-            </button>
-            <button
-              type="button"
-              onClick={() => pruebaRapida('20231015042')}
-              className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg border border-amber-200 font-medium transition cursor-pointer"
-            >
-              20231015042 (Sofía - Pago Pendiente)
-            </button>
-            <button
-              type="button"
-              onClick={() => pruebaRapida('20212015099')}
-              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 font-medium transition cursor-pointer"
-            >
-              20212015099 (Lucas - Exento)
             </button>
           </div>
         </form>
@@ -249,15 +244,30 @@ export default function ConsultaCertificadosCliente() {
 
                     {/* Botones de Descarga PDF */}
                     <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row gap-2">
-                      <a
-                        href={`/api/certificado/${item.asistenciaId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#D2202E] hover:bg-[#B01824] text-white font-bold text-xs rounded-xl shadow-md shadow-[#D2202E]/20 transition"
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleDescargarCertificado(
+                            item,
+                            resultado.usuario,
+                            resultado.configuracionGlobal
+                          )
+                        }
+                        disabled={descargandoId === item.asistenciaId}
+                        className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#D2202E] hover:bg-[#B01824] disabled:bg-rose-300 text-white font-bold text-xs rounded-xl shadow-md shadow-[#D2202E]/20 transition cursor-pointer"
                       >
-                        <Award className="w-4 h-4" />
-                        Descargar Certificado (PDF)
-                      </a>
+                        {descargandoId === item.asistenciaId ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Generando PDF...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Award className="w-4 h-4" />
+                            <span>Descargar Certificado (PDF)</span>
+                          </>
+                        )}
+                      </button>
                       <a
                         href={`/api/escarapela/${item.inscripcionId}`}
                         target="_blank"

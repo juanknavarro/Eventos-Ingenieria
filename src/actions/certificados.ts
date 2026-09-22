@@ -12,6 +12,13 @@ export interface EventoAsistidoItem {
   asignaturaBonificacion: string | null
   horaAsistencia: Date
   estadoPago: string
+  
+  // Metadatos de Certificación en PDF
+  certificadoPlantillaUrl?: string | null
+  horasAcademicas?: number | null
+  firmaDirectorUrl?: string | null
+  nombreFirmante2?: string | null
+  cargoFirmante2?: string | null
 }
 
 export interface EventoPendienteItem {
@@ -33,6 +40,14 @@ export interface ConsultaEstudianteResultado {
     email: string
     carrera: string | null
   }
+  configuracionGlobal?: {
+    logoUrl?: string
+    firmaDecanoUrl?: string | null
+    nombreDecano?: string
+    cargoFirmante?: string
+    plantillaFondoDefaultUrl?: string | null
+    horasAcademicasDefault?: number
+  }
   eventosAsistidos: EventoAsistidoItem[]
   eventosPendientes: EventoPendienteItem[]
 }
@@ -52,24 +67,29 @@ export async function consultarCertificadosEstudiante(
   }
 
   try {
-    const usuario = await prisma.usuario.findFirst({
-      where: {
-        OR: [
-          { codigoEstudiantil: doc },
-          { email: doc },
-          { id: doc },
-        ],
-      },
-      include: {
-        inscripciones: {
-          include: {
-            evento: true,
-            asistencia: true,
-          },
-          orderBy: { fechaInscripcion: 'desc' },
+    const [usuario, configPlantillas] = await Promise.all([
+      prisma.usuario.findFirst({
+        where: {
+          OR: [
+            { codigoEstudiantil: doc },
+            { email: doc },
+            { id: doc },
+          ],
         },
-      },
-    })
+        include: {
+          inscripciones: {
+            include: {
+              evento: true,
+              asistencia: true,
+            },
+            orderBy: { fechaInscripcion: 'desc' },
+          },
+        },
+      }),
+      prisma.configuracionPlantillas.findUnique({
+        where: { id: 'global_config' },
+      }).catch(() => null),
+    ])
 
     if (!usuario) {
       return {
@@ -84,6 +104,7 @@ export async function consultarCertificadosEstudiante(
     const eventosPendientes: EventoPendienteItem[] = []
 
     for (const ins of usuario.inscripciones) {
+      const ev = ins.evento as any
       if (ins.asistencia) {
         eventosAsistidos.push({
           inscripcionId: ins.id,
@@ -95,6 +116,11 @@ export async function consultarCertificadosEstudiante(
           asignaturaBonificacion: ins.asignatura_bonificacion,
           horaAsistencia: ins.asistencia.fechaHoraRegistro,
           estadoPago: ins.estado_pago,
+          certificadoPlantillaUrl: ev?.certificado_plantilla_url || null,
+          horasAcademicas: ev?.horas_academicas || 4,
+          firmaDirectorUrl: ev?.firma_director_url || null,
+          nombreFirmante2: ev?.nombre_firmante_2 || null,
+          cargoFirmante2: ev?.cargo_firmante_2 || null,
         })
       } else {
         let motivo: 'PAGO_PENDIENTE' | 'SIN_ASISTENCIA' | 'PAGO_RECHAZADO' = 'SIN_ASISTENCIA'
@@ -112,6 +138,18 @@ export async function consultarCertificadosEstudiante(
       }
     }
 
+    const cfg = configPlantillas as any
+    const configuracionGlobal = cfg
+      ? {
+          logoUrl: cfg.logo_url || '/imagen_2.png',
+          firmaDecanoUrl: cfg.firma_decano_url || null,
+          nombreDecano: cfg.nombre_decano || 'Ing. Roberto Gómez',
+          cargoFirmante: cfg.cargo_firmante || 'Decano Facultad de Ciencias e Ingenierías',
+          plantillaFondoDefaultUrl: cfg.plantilla_fondo_default_url || '/imagen_2.png',
+          horasAcademicasDefault: cfg.horas_academicas_default || 4,
+        }
+      : undefined
+
     return {
       success: true,
       mensaje:
@@ -125,6 +163,7 @@ export async function consultarCertificadosEstudiante(
         email: usuario.email,
         carrera: usuario.carrera,
       },
+      configuracionGlobal,
       eventosAsistidos,
       eventosPendientes,
     }

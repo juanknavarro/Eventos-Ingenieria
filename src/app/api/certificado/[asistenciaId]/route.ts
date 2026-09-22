@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { generarPdfCertificado } from '@/lib/pdf/generadorCertificado'
+import { generarCertificadoPdf } from '@/lib/pdf/generador'
 import { obtenerConfiguracionPlantillas } from '@/lib/config/plantillas'
 
 export async function GET(
@@ -41,23 +41,23 @@ export async function GET(
 
     const { inscripcion } = asistencia
     const { usuario, evento } = inscripcion
+    const ev = evento as any
 
-    const pdfBytes = await generarPdfCertificado({
+    const pdfBytes = await generarCertificadoPdf({
       asistenciaId: asistencia.id,
       alumnoNombre: usuario.nombre,
-      alumnoCodigo: usuario.codigoEstudiantil || usuario.id,
+      alumnoDocumento: usuario.codigoEstudiantil || usuario.id,
       alumnoCarrera: usuario.carrera || 'Facultad de Ingenierías',
       eventoTitulo: evento.titulo,
-      eventoUbicacion: evento.ubicacion,
-      eventoFecha: evento.fechaInicio,
-      organizadorNombre: evento.organizador?.nombre || 'Coordinación Académica',
-      fechaRegistroAsistencia: asistencia.fechaHoraRegistro,
-      colorPrimarioHex: configPlantillas.color_primario,
-      colorSecundarioHex: configPlantillas.color_secundario,
-      logoUniversidadUrl: configPlantillas.logo_url,
+      horasAcademicas: ev.horas_academicas || configPlantillas.horas_academicas_default || 4,
+      fechaEvento: evento.fechaInicio,
+      fondoUrl: ev.certificado_plantilla_url || configPlantillas.plantilla_fondo_default_url || '/imagen_2.png',
       firmaDecanoUrl: configPlantillas.firma_decano_url,
       nombreDecano: configPlantillas.nombre_decano,
-      cargoFirmante: configPlantillas.cargo_firmante,
+      cargoDecano: configPlantillas.cargo_firmante,
+      firmaDirectorUrl: ev.firma_director_url,
+      nombreFirmante2: ev.nombre_firmante_2,
+      cargoFirmante2: ev.cargo_firmante_2,
     })
 
     return new NextResponse(Buffer.from(pdfBytes), {

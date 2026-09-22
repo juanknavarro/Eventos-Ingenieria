@@ -1,81 +1,98 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { AUTH_COOKIE_NAME, verifyJwtSession } from '@/lib/auth/jwt'
 
-export const AUTH_COOKIE_NAME = 'eventos_auth_user_session'
-
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // 1. Verificar si la ruta requiere autorización especial
-  const esRutaAdmin = pathname.startsWith('/admin')
-  const esRutaProfesor = pathname.startsWith('/profesor')
-  const esRutaStaff = pathname.startsWith('/staff')
+  // 1. Identificar segmento institucional protegido
+  // Nota: Las rutas públicas (/ , /certificados, /login, /api) NO se interceptan aquí
+  const esRutaAdmin = pathname === '/admin' || pathname.startsWith('/admin/')
+  const esRutaProfesor = pathname === '/profesor' || pathname.startsWith('/profesor/')
+  const esRutaStaff = pathname === '/staff' || pathname.startsWith('/staff/')
 
-  // Si no es una ruta protegida, permitir el paso inmediato (ej. /, /certificados, /login, /api)
   if (!esRutaAdmin && !esRutaProfesor && !esRutaStaff) {
     return NextResponse.next()
   }
 
-  // 2. Extraer y decodificar la cookie de sesión de autenticación
+  // 2. Extraer y verificar criptográficamente la sesión JWT del personal
   const authCookie = request.cookies.get(AUTH_COOKIE_NAME)
-  let sessionData: { rol?: string; email?: string; nombre?: string } | null = null
+  const sessionUser = authCookie?.value ? await verifyJwtSession(authCookie.value) : null
 
-  if (authCookie?.value) {
-    try {
-      const decoded = Buffer.from(authCookie.value, 'base64').toString('utf-8')
-      sessionData = JSON.parse(decoded)
-    } catch {
-      sessionData = null
-    }
-  }
-
-  // 3. Si no está autenticado, redirigir inmediatamente a /login con el parámetro de retorno
-  if (!sessionData || !sessionData.rol) {
+  // 3. Si no hay sesión válida de personal, redirigir a /login
+  if (!sessionUser) {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('redirect', pathname)
     loginUrl.searchParams.set('error', 'no_autenticado')
-    return NextResponse.redirect(loginUrl)
+
+    const response = NextResponse.redirect(loginUrl)
+    if (authCookie?.value) {
+      response.cookies.delete(AUTH_COOKIE_NAME)
+    }
+    return response
   }
 
-  const rol = sessionData.rol
+  const { rol } = sessionUser
 
-  // 4. Regla para /admin: SUPER_ADMIN o ADMIN (Jefe de Programa)
+  // 4. Protección para /admin (Exclusivo: SUPER_ADMIN o ADMIN)
   if (esRutaAdmin) {
-    if (rol !== 'ADMIN' && rol !== 'SUPER_ADMIN') {
-      const errorUrl = new URL('/login', request.url)
-      errorUrl.searchParams.set('error', 'acceso_denegado_admin')
-      return NextResponse.redirect(errorUrl)
+    const tieneAcceso = rol === 'SUPER_ADMIN' || rol === 'ADMIN'
+    if (!tieneAcceso) {
+      if (rol === 'PROFESOR') {
+        const redirectUrl = new URL('/profesor', request.url)
+        redirectUrl.searchParams.set('error', 'acceso_denegado_admin')
+        return NextResponse.redirect(redirectUrl)
+      }
+
+      if (rol === 'STAFF') {
+        const redirectUrl = new URL('/staff/asistencia', request.url)
+        redirectUrl.searchParams.set('error', 'acceso_denegado_admin')
+        return NextResponse.redirect(redirectUrl)
+      }
+
+      const redirectUrl = new URL('/login', request.url)
+      redirectUrl.searchParams.set('error', 'acceso_denegado_admin')
+      return NextResponse.redirect(redirectUrl)
     }
   }
 
-  // 5. Regla para /profesor: 'PROFESOR', 'ADMIN' o 'SUPER_ADMIN'
+  // 5. Protección para /profesor (Exclusivo: PROFESOR, ADMIN o SUPER_ADMIN)
   if (esRutaProfesor) {
     const tieneAcceso = rol === 'PROFESOR' || rol === 'ADMIN' || rol === 'SUPER_ADMIN'
     if (!tieneAcceso) {
-      const errorUrl = new URL('/login', request.url)
-      errorUrl.searchParams.set('error', 'acceso_denegado_profesor')
-      return NextResponse.redirect(errorUrl)
+      if (rol === 'STAFF') {
+        const redirectUrl = new URL('/staff/asistencia', request.url)
+        redirectUrl.searchParams.set('error', 'acceso_denegado_profesor')
+        return NextResponse.redirect(redirectUrl)
+      }
+
+      const redirectUrl = new URL('/login', request.url)
+      redirectUrl.searchParams.set('error', 'acceso_denegado_profesor')
+      return NextResponse.redirect(redirectUrl)
     }
   }
 
-  // 6. Regla para /staff: 'STAFF', 'ADMIN', 'PROFESOR' o 'SUPER_ADMIN'
+  // 6. Protección para /staff (Exclusivo: STAFF, ADMIN, PROFESOR o SUPER_ADMIN)
   if (esRutaStaff) {
     const tieneAcceso = rol === 'STAFF' || rol === 'ADMIN' || rol === 'PROFESOR' || rol === 'SUPER_ADMIN'
     if (!tieneAcceso) {
-      const errorUrl = new URL('/login', request.url)
-      errorUrl.searchParams.set('error', 'acceso_denegado_staff')
-      return NextResponse.redirect(errorUrl)
+      const redirectUrl = new URL('/login', request.url)
+      redirectUrl.searchParams.set('error', 'acceso_denegado_staff')
+      return NextResponse.redirect(redirectUrl)
     }
   }
 
   return NextResponse.next()
 }
 
-// Configurar matcher para interceptar únicamente las rutas protegidas
+// Matcher exclusivo para rutas del personal interno
 export const config = {
   matcher: [
+    '/admin',
     '/admin/:path*',
+    '/profesor',
     '/profesor/:path*',
+    '/staff',
     '/staff/:path*',
   ],
 }

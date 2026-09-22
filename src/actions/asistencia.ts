@@ -2,7 +2,8 @@
 
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
-import { MetodoAsistencia, EstadoPago } from '@prisma/client'
+import { MetodoAsistencia, EstadoPago, RolUsuario } from '@prisma/client'
+import { getAuthSession } from '@/lib/auth/session'
 
 export interface ValidarAsistenciaInput {
   documento: string // Código estudiantil, cédula o email
@@ -77,6 +78,21 @@ export async function registrarAsistenciaPorDocumento({
   }
 
   try {
+    const session = await getAuthSession()
+    if (
+      !session ||
+      (session.rol !== RolUsuario.STAFF &&
+        session.rol !== RolUsuario.ADMIN &&
+        session.rol !== RolUsuario.PROFESOR &&
+        session.rol !== RolUsuario.SUPER_ADMIN)
+    ) {
+      return {
+        success: false,
+        tipo: 'ERROR_SERVIDOR',
+        mensaje: 'Acceso no autorizado: Se requieren privilegios de Staff, Docente o Administrador.',
+      }
+    }
+
     // 1. Buscar al usuario por código estudiantil, email o ID
     const usuario = await prisma.usuario.findFirst({
       where: {
@@ -237,7 +253,7 @@ export async function registrarAsistenciaPorDocumento({
     const nuevaAsistencia = await prisma.asistencia.create({
       data: {
         inscripcionId: inscripcion.id,
-        registradoPorId: staffId || null,
+        registradoPorId: staffId || session.id,
         metodo: (metodo as MetodoAsistencia) || MetodoAsistencia.QR,
         observaciones: 'Ingreso validado en puerta con lector de código de barras/cédula',
         fechaHoraRegistro: new Date(),

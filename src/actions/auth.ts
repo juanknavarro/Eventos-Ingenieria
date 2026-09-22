@@ -42,17 +42,30 @@ export async function iniciarSesionConCredenciales(
       }
     }
 
-    // Si el usuario tiene passwordHash configurado, verificarlo con bcrypt
-    if (usuario.passwordHash) {
-      const passwordValida = await bcrypt.compare(password, usuario.passwordHash)
-      // También permitir coincidencia directa si está en texto plano (fallback seguro)
-      const coincidePlano = usuario.passwordHash === password
+    // Regla de Negocio: Los estudiantes (ALUMNO) no inician sesión. El acceso es solo para personal institucional
+    if (usuario.rol === 'ALUMNO') {
+      return {
+        success: false,
+        error:
+          'El acceso con usuario y contraseña es exclusivo para personal docente, administrativo y de apoyo. Si eres estudiante, puedes consultar tus certificados y participar en eventos directamente desde el portal público sin necesidad de iniciar sesión.',
+      }
+    }
 
-      if (!passwordValida && !coincidePlano) {
-        return {
-          success: false,
-          error: 'Credenciales inválidas. Correo electrónico o contraseña incorrecta.',
-        }
+    // Exigir contraseña obligatoria y rechazar cuentas sin hash configurado
+    if (!usuario.passwordHash) {
+      return {
+        success: false,
+        error: 'Esta cuenta no tiene contraseña habilitada. Contacta al administrador.',
+      }
+    }
+
+    const passwordValida = await bcrypt.compare(password, usuario.passwordHash)
+    const coincidePlano = usuario.passwordHash === password
+
+    if (!passwordValida && !coincidePlano) {
+      return {
+        success: false,
+        error: 'Credenciales inválidas. Correo electrónico o contraseña incorrecta.',
       }
     }
 
@@ -81,7 +94,7 @@ export async function iniciarSesionConCredenciales(
       if (usuario.rol === 'SUPER_ADMIN' || usuario.rol === 'ADMIN') destino = '/admin'
       else if (usuario.rol === 'PROFESOR') destino = '/profesor'
       else if (usuario.rol === 'STAFF') destino = '/staff/asistencia'
-      else destino = '/certificados'
+      else destino = '/'
     }
 
     return { success: true, redirectUrl: destino }

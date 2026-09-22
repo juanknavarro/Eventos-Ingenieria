@@ -44,6 +44,11 @@ enum MetodoAsistencia {
   BIOMETRICO
 }
 
+enum MetodoPago {
+  EFECTIVO
+  TRANSFERENCIA
+}
+
 // ==========================================
 // MODELS
 // ==========================================
@@ -88,6 +93,14 @@ model Evento {
   logo_universidad_url String?      // URL o ruta al logo oficial de la Universidad del Sinú
   imagen_central_url   String?      // Imagen temática central alusiva al evento
   sponsors_url         String?      // Imagen o franja de patrocinadores oficiales
+  
+  // Soporte de Certificación Oficial en PDF
+  certificado_plantilla_url String?  // URL de la plantilla base en alta resolución (PNG/JPG)
+  horas_academicas          Int?     @default(4) // Intensidad horaria certificada (ej. 4, 8, 20 horas)
+  firma_director_url        String?  // Firma escaneada del docente organizador o director de programa
+  nombre_firmante_2         String?  // Nombre del segundo firmante
+  cargo_firmante_2          String?  // Cargo del segundo firmante
+
   programa_academico   String?      @default("Facultad de Ingenierías") // Programa académico (Multi-Tenancy)
   programaId           String?
   programa             Programa?    @relation(fields: [programaId], references: [id], onDelete: SetNull)
@@ -112,7 +125,8 @@ model Inscripcion {
   asignatura_bonificacion     String?    // Asignatura donde se aplicará la bonificación académica
   profesor_responsable_dinero String?    // Nombre/descripción del docente encargado de recaudar/validar
   profesorResponsableId       String?    // Relación referencial opcional al usuario docente
-  estado_pago                 EstadoPago @default(PENDIENTE)
+  estado_pago                 EstadoPago  @default(PENDIENTE)
+  metodo_pago                 MetodoPago?
   
   montoPagado                 Float      @default(0.0)
   comprobanteUrl              String?    // URL o referencia al recibo de pago
@@ -156,6 +170,10 @@ model ConfiguracionPlantillas {
   cargo_firmante   String   @default("Decano de Ingenierías")
   color_primario   String   @default("#0B305B") // Azul Marino Institucional
   color_secundario String   @default("#D2202E") // Rojo Institucional
+
+  // Plantilla y Horas por Defecto para Certificados Institucionales
+  plantilla_fondo_default_url String?  @default("/imagen_2.png")
+  horas_academicas_default    Int      @default(4)
 
   // Textos dinámicos de la convocatoria en la página principal pública
   titulo_convocatoria      String   @default("Convocatoria Académica Abierta")

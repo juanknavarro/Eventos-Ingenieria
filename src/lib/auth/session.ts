@@ -1,37 +1,24 @@
 import { cookies } from 'next/headers'
-import prisma from '@/lib/prisma'
 import { RolUsuario } from '@prisma/client'
+import {
+  AUTH_COOKIE_NAME,
+  AuthSessionUser,
+  signJwtSession,
+  verifyJwtSession,
+} from './jwt'
 
-export const AUTH_COOKIE_NAME = 'eventos_auth_user_session'
-
-export interface AuthSessionUser {
-  id: string
-  email: string
-  nombre: string
-  rol: RolUsuario
-  carrera: string | null
-  codigoEstudiantil: string | null
-}
+export { AUTH_COOKIE_NAME }
+export type { AuthSessionUser }
 
 /**
- * Establece la sesión de usuario en una cookie HTTP-Only segura
+ * Establece la sesión de usuario en una cookie HTTP-Only segura firmada con JWT.
+ * El token está sellado con HMAC-SHA256 usando AUTH_SECRET.
  */
 export async function setAuthSession(user: AuthSessionUser) {
   const cookieStore = await cookies()
-  const payload = JSON.stringify({
-    id: user.id,
-    email: user.email,
-    nombre: user.nombre,
-    rol: user.rol,
-    carrera: user.carrera,
-    codigoEstudiantil: user.codigoEstudiantil,
-    issuedAt: Date.now(),
-  })
+  const token = await signJwtSession(user)
 
-  // Codificar de forma segura en Base64
-  const encoded = Buffer.from(payload).toString('base64')
-
-  cookieStore.set(AUTH_COOKIE_NAME, encoded, {
+  cookieStore.set(AUTH_COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
@@ -41,7 +28,8 @@ export async function setAuthSession(user: AuthSessionUser) {
 }
 
 /**
- * Obtiene la sesión actual desde las cookies en Server Components o Server Actions
+ * Obtiene la sesión actual desde las cookies y verifica rigurosamente su firma criptográfica.
+ * Retorna null si la cookie no existe, fue manipulada en el cliente o ha expirado.
  */
 export async function getAuthSession(): Promise<AuthSessionUser | null> {
   try {
@@ -49,18 +37,14 @@ export async function getAuthSession(): Promise<AuthSessionUser | null> {
     const cookie = cookieStore.get(AUTH_COOKIE_NAME)
     if (!cookie?.value) return null
 
-    const decoded = Buffer.from(cookie.value, 'base64').toString('utf-8')
-    const session = JSON.parse(decoded) as AuthSessionUser
-
-    if (!session?.id || !session?.rol) return null
-    return session
+    return await verifyJwtSession(cookie.value)
   } catch {
     return null
   }
 }
 
 /**
- * Elimina la cookie de sesión (Logout)
+ * Elimina la cookie de sesión (Cerrar sesión / Logout)
  */
 export async function clearAuthSession() {
   const cookieStore = await cookies()
@@ -75,7 +59,7 @@ export async function verificarPermiso(rolesPermitidos: RolUsuario[]): Promise<A
   if (!session) return null
 
   if (
-    rolesPermitidos.includes(session.rol) ||
+    rolesPermitidos.includes(session.rol as RolUsuario) ||
     session.rol === RolUsuario.SUPER_ADMIN ||
     session.rol === RolUsuario.ADMIN
   ) {
@@ -84,4 +68,3 @@ export async function verificarPermiso(rolesPermitidos: RolUsuario[]): Promise<A
 
   return null
 }
-

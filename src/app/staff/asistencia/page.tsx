@@ -27,19 +27,6 @@ export default async function ControlAsistenciaStaffPage() {
   }
 
   const filtroEventos = filtroEventosPorTenancy(sesion)
-  const filtroStaff =
-    sesion.rol === RolUsuario.SUPER_ADMIN || !sesion.carrera
-      ? {
-          rol: {
-            in: [RolUsuario.STAFF, RolUsuario.ADMIN, RolUsuario.PROFESOR],
-          },
-        }
-      : {
-          rol: {
-            in: [RolUsuario.STAFF, RolUsuario.ADMIN, RolUsuario.PROFESOR],
-          },
-          carrera: { contains: sesion.carrera, mode: 'insensitive' as const },
-        }
 
   const filtroAsistencias =
     sesion.rol === RolUsuario.SUPER_ADMIN || !sesion.carrera
@@ -61,19 +48,7 @@ export default async function ControlAsistenciaStaffPage() {
           ],
         }
 
-  const [staffList, eventos, asistenciasRaw] = await Promise.all([
-    // Consultar usuarios con rol STAFF o ADMIN filtrados por programa
-    prisma.usuario.findMany({
-      where: filtroStaff,
-      select: {
-        id: true,
-        nombre: true,
-        email: true,
-        rol: true,
-        carrera: true,
-      },
-      orderBy: { nombre: 'asc' },
-    }),
+  const [eventos, asistenciasRaw] = await Promise.all([
     // Consultar eventos activos filtrados por programa
     prisma.evento.findMany({
       where: filtroEventos,
@@ -124,7 +99,7 @@ export default async function ControlAsistenciaStaffPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#061930] via-[#0B305B] to-[#041121] text-slate-100">
       {/* Header del Módulo de Asistencia Unisinú */}
-      <header className="border-b-2 border-[#D2202E]/40 bg-[#0B305B]/90 backdrop-blur-md sticky top-0 z-40 shadow-lg">
+      <header className="border-b-2 border-[#D2202E]/40 bg-[#0B305B] sticky top-0 z-40 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link
@@ -184,8 +159,13 @@ export default async function ControlAsistenciaStaffPage() {
       {/* Contenido Principal */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <ControlAsistenciaCliente
+          staffActual={{
+            id: sesion.id,
+            nombre: sesion.nombre,
+            email: sesion.email,
+            rol: sesion.rol,
+          }}
           eventos={eventos}
-          staffList={staffList}
           historialInicial={asistenciasRaw}
         />
       </main>
