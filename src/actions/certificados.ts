@@ -13,9 +13,13 @@ export interface EventoAsistidoItem {
   horaAsistencia: Date
   estadoPago: string
   
-  // Metadatos de Certificación en PDF
+  // Metadatos de Certificación y Escarapela en PDF
   certificadoPlantillaUrl?: string | null
+  escarapelaPlantillaUrl?: string | null
   horasAcademicas?: number | null
+  nombreFirmante1?: string | null
+  cargoFirmante1?: string | null
+  firmaOrganizadorUrl?: string | null
   firmaDirectorUrl?: string | null
   nombreFirmante2?: string | null
   cargoFirmante2?: string | null
@@ -27,6 +31,7 @@ export interface EventoPendienteItem {
   eventoTitulo: string
   eventoFecha: Date
   estadoPago: string
+  escarapelaPlantillaUrl?: string | null
   motivo: 'PAGO_PENDIENTE' | 'SIN_ASISTENCIA' | 'PAGO_RECHAZADO'
 }
 
@@ -117,7 +122,11 @@ export async function consultarCertificadosEstudiante(
           horaAsistencia: ins.asistencia.fechaHoraRegistro,
           estadoPago: ins.estado_pago,
           certificadoPlantillaUrl: ev?.certificado_plantilla_url || null,
+          escarapelaPlantillaUrl: ev?.escarapela_plantilla_url || null,
           horasAcademicas: ev?.horas_academicas || 4,
+          nombreFirmante1: ev?.nombre_firmante_1 || null,
+          cargoFirmante1: ev?.cargo_firmante_1 || null,
+          firmaOrganizadorUrl: ev?.firma_organizador_url || null,
           firmaDirectorUrl: ev?.firma_director_url || null,
           nombreFirmante2: ev?.nombre_firmante_2 || null,
           cargoFirmante2: ev?.cargo_firmante_2 || null,
@@ -133,6 +142,7 @@ export async function consultarCertificadosEstudiante(
           eventoTitulo: ins.evento.titulo,
           eventoFecha: ins.evento.fechaInicio,
           estadoPago: ins.estado_pago,
+          escarapelaPlantillaUrl: ev?.escarapela_plantilla_url || null,
           motivo,
         })
       }

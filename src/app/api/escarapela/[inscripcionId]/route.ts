@@ -28,20 +28,24 @@ export async function GET(
       )
     }
 
+    const ev = inscripcion.evento as any
+
     const pdfBytes = await generarPdfEscarapela({
       alumnoNombre: inscripcion.usuario.nombre,
       alumnoCedula: inscripcion.usuario.cedula || inscripcion.usuario.codigoEstudiantil || '1000000000',
       alumnoCodigo: inscripcion.usuario.codigoEstudiantil || inscripcion.usuario.id,
       alumnoCarrera: inscripcion.usuario.carrera || 'Facultad de Ingenierías',
       alumnoSemestre: inscripcion.usuario.semestre || 'Semestre en Curso',
+      rolAsistente: 'ESTUDIANTE / ASISTENTE',
       eventoTitulo: inscripcion.evento.titulo,
-      eventoLogoFondoUrl: inscripcion.evento.logo_fondo_url,
+      fondoUrl: ev?.escarapela_plantilla_url || inscripcion.evento.logo_fondo_url,
       eventoLogoUniversidadUrl: configPlantillas.logo_url || inscripcion.evento.logo_universidad_url,
       eventoImagenCentralUrl: inscripcion.evento.imagen_central_url || inscripcion.evento.imagenUrl,
       eventoSponsorsUrl: inscripcion.evento.sponsors_url,
-      estadoPago: inscripcion.estado_pago,
       colorPrimarioHex: configPlantillas.color_primario,
       colorSecundarioHex: configPlantillas.color_secundario,
+      qrPayload: inscripcion.usuario.codigoEstudiantil || inscripcion.usuario.cedula || inscripcion.id,
+      inscripcionId: inscripcion.id,
     })
 
     return new NextResponse(Buffer.from(pdfBytes), {

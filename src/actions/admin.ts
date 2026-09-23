@@ -131,8 +131,12 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
     let sponsorsUrl = (formData.get('sponsors_url') as string) || null
 
     let certificadoPlantillaUrl = (formData.get('certificado_plantilla_url') as string)?.trim() || null
+    let escarapelaPlantillaUrl = (formData.get('escarapela_plantilla_url') as string)?.trim() || null
     const horasAcademicasStr = formData.get('horas_academicas') as string
     const horasAcademicas = horasAcademicasStr ? parseInt(horasAcademicasStr, 10) : 4
+    let firmaOrganizadorUrl = (formData.get('firma_organizador_url') as string)?.trim() || null
+    const nombreFirmante1 = (formData.get('nombre_firmante_1') as string)?.trim() || null
+    const cargoFirmante1 = (formData.get('cargo_firmante_1') as string)?.trim() || null
     let firmaDirectorUrl = (formData.get('firma_director_url') as string)?.trim() || null
     const nombreFirmante2 = (formData.get('nombre_firmante_2') as string)?.trim() || null
     const cargoFirmante2 = (formData.get('cargo_firmante_2') as string)?.trim() || null
@@ -177,7 +181,25 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
       }
     }
 
-    // 5. Procesar archivo de Firma de Director/Organizador si fue subido
+    // 5. Procesar archivo de Plantilla de Escarapela si fue subido
+    const archivoEscarapela = formData.get('archivo_escarapela_plantilla') as File | null
+    if (archivoEscarapela && archivoEscarapela.size > 0) {
+      const subida = await subirArchivoRecursosEventos(archivoEscarapela, 'escarapela')
+      if (subida.url) {
+        escarapelaPlantillaUrl = subida.url
+      }
+    }
+
+    // 6. Procesar archivo de Firma de Primer Firmante / Organizador si fue subido
+    const archivoFirmaOrganizador = formData.get('archivo_firma_organizador') as File | null
+    if (archivoFirmaOrganizador && archivoFirmaOrganizador.size > 0) {
+      const subida = await subirArchivoRecursosEventos(archivoFirmaOrganizador, 'firma_organizador')
+      if (subida.url) {
+        firmaOrganizadorUrl = subida.url
+      }
+    }
+
+    // 7. Procesar archivo de Firma de Segundo Firmante / Director si fue subido
     const archivoFirmaDirector = formData.get('archivo_firma_director') as File | null
     if (archivoFirmaDirector && archivoFirmaDirector.size > 0) {
       const subida = await subirArchivoRecursosEventos(archivoFirmaDirector, 'firma_director')
@@ -208,7 +230,11 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
         imagen_central_url: imagenCentralUrl,
         sponsors_url: sponsorsUrl,
         certificado_plantilla_url: certificadoPlantillaUrl,
+        escarapela_plantilla_url: escarapelaPlantillaUrl,
         horas_academicas: horasAcademicas,
+        nombre_firmante_1: nombreFirmante1,
+        cargo_firmante_1: cargoFirmante1,
+        firma_organizador_url: firmaOrganizadorUrl,
         firma_director_url: firmaDirectorUrl,
         nombre_firmante_2: nombreFirmante2,
         cargo_firmante_2: cargoFirmante2,
@@ -254,8 +280,12 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
     let sponsorsUrl = (formData.get('sponsors_url') as string) || null
 
     let certificadoPlantillaUrl = (formData.get('certificado_plantilla_url') as string)?.trim() || null
+    let escarapelaPlantillaUrl = (formData.get('escarapela_plantilla_url') as string)?.trim() || null
     const horasAcademicasStr = formData.get('horas_academicas') as string
     const horasAcademicas = horasAcademicasStr ? parseInt(horasAcademicasStr, 10) : 4
+    let firmaOrganizadorUrl = (formData.get('firma_organizador_url') as string)?.trim() || null
+    const nombreFirmante1 = (formData.get('nombre_firmante_1') as string)?.trim() || null
+    const cargoFirmante1 = (formData.get('cargo_firmante_1') as string)?.trim() || null
     let firmaDirectorUrl = (formData.get('firma_director_url') as string)?.trim() || null
     const nombreFirmante2 = (formData.get('nombre_firmante_2') as string)?.trim() || null
     const cargoFirmante2 = (formData.get('cargo_firmante_2') as string)?.trim() || null
@@ -318,7 +348,25 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
       }
     }
 
-    // 5. Procesar archivo de Firma de Director/Organizador si fue subido
+    // 5. Procesar archivo de Plantilla de Escarapela si fue subido
+    const archivoEscarapela = formData.get('archivo_escarapela_plantilla') as File | null
+    if (archivoEscarapela && archivoEscarapela.size > 0) {
+      const subida = await subirArchivoRecursosEventos(archivoEscarapela, 'escarapela')
+      if (subida.url) {
+        escarapelaPlantillaUrl = subida.url
+      }
+    }
+
+    // 6. Procesar archivo de Firma de Primer Firmante / Organizador si fue subido
+    const archivoFirmaOrganizador = formData.get('archivo_firma_organizador') as File | null
+    if (archivoFirmaOrganizador && archivoFirmaOrganizador.size > 0) {
+      const subida = await subirArchivoRecursosEventos(archivoFirmaOrganizador, 'firma_organizador')
+      if (subida.url) {
+        firmaOrganizadorUrl = subida.url
+      }
+    }
+
+    // 7. Procesar archivo de Firma de Segundo Firmante / Director si fue subido
     const archivoFirmaDirector = formData.get('archivo_firma_director') as File | null
     if (archivoFirmaDirector && archivoFirmaDirector.size > 0) {
       const subida = await subirArchivoRecursosEventos(archivoFirmaDirector, 'firma_director')
@@ -343,7 +391,11 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
         imagen_central_url: imagenCentralUrl,
         sponsors_url: sponsorsUrl,
         certificado_plantilla_url: certificadoPlantillaUrl,
+        escarapela_plantilla_url: escarapelaPlantillaUrl,
         horas_academicas: horasAcademicas,
+        nombre_firmante_1: nombreFirmante1,
+        cargo_firmante_1: cargoFirmante1,
+        firma_organizador_url: firmaOrganizadorUrl,
         firma_director_url: firmaDirectorUrl,
         nombre_firmante_2: nombreFirmante2,
         cargo_firmante_2: cargoFirmante2,

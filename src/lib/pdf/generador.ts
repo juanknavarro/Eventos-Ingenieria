@@ -11,6 +11,9 @@ export interface DatosGeneracionCertificado {
   firmaDecanoUrl?: string | null
   nombreDecano?: string | null
   cargoDecano?: string | null
+  nombreFirmante1?: string | null
+  cargoFirmante1?: string | null
+  firmaOrganizadorUrl?: string | null
   firmaDirectorUrl?: string | null
   nombreFirmante2?: string | null
   cargoFirmante2?: string | null
@@ -285,95 +288,91 @@ export async function generarCertificadoPdf(
     color: colorGris,
   })
 
-  // 8. Firmas Institucionales (Decanatura y Dirección/Coordinación)
-  const yLineasFirmas = 85
-  const yTextoNombre = yLineasFirmas - 16
-  const yTextoCargo = yLineasFirmas - 28
-
-  // --- Firma 1: Decano (Izquierda) ---
-  const centroFirma1 = 230
+  // 8. Firmas Institucionales Calibradas (Firma 1 Izquierda y Firma 2 Derecha)
+  const yLineasFirmas = 88
   const anchoLineaFirma = 190
 
-  const firmaDecanoImg = await cargarEIncrustarImagen(pdfDoc, datos.firmaDecanoUrl)
-  if (firmaDecanoImg) {
-    const firmaW = 85
-    const firmaH = 38
-    page.drawImage(firmaDecanoImg, {
-      x: centroFirma1 - firmaW / 2,
-      y: yLineasFirmas + 2,
-      width: firmaW,
-      height: firmaH,
+  // Coordenadas X de los centros de las dos columnas simétricas
+  const centroFirma1 = 230          // Columna Izquierda (Firma 1 / Decanatura o Docente Líder)
+  const centroFirma2 = width - 230  // Columna Derecha (Firma 2 / Dirección de Programa o Comité)
+
+  // Datos normalizados Firma 1 (Izquierda) con soporte de configuración por evento y fallback global
+  const nombreFirma1 = (datos.nombreFirmante1 || datos.nombreDecano || 'Ing. Roberto Gómez').trim()
+  const cargoFirma1 = (datos.cargoFirmante1 || datos.cargoDecano || 'Decano Facultad de Ciencias e Ingenierías').trim()
+  const urlFirma1 = datos.firmaOrganizadorUrl || datos.firmaDecanoUrl
+
+  // Datos normalizados Firma 2 (Derecha) con soporte de configuración por evento y fallback institucional
+  const nombreFirma2 = (datos.nombreFirmante2 || 'Comité Académico Docente').trim()
+  const cargoFirma2 = (datos.cargoFirmante2 || 'Coordinación de Formación Continua').trim()
+  const urlFirma2 = datos.firmaDirectorUrl
+
+  // Función utilitaria para estampar cada columna de firma con riguroso centrado matemático
+  const estamparFirmaColumna = async (
+    centroX: number,
+    nombre: string,
+    cargo: string,
+    firmaUrl?: string | null
+  ) => {
+    // A. Firma escaneada / digital (centrada horizontalmente respecto al centro de su columna)
+    const firmaImg = await cargarEIncrustarImagen(pdfDoc, firmaUrl)
+    if (firmaImg) {
+      const maxW = 105
+      const maxH = 42
+      const dims = firmaImg.scale(1)
+      const ratio = Math.min(maxW / dims.width, maxH / dims.height, 1)
+      const fW = dims.width * ratio
+      const fH = dims.height * ratio
+
+      page.drawImage(firmaImg, {
+        x: centroX - fW / 2,
+        y: yLineasFirmas + 4,
+        width: fW,
+        height: fH,
+      })
+    }
+
+    // B. Línea horizontal de firma centrada en su columna
+    page.drawLine({
+      start: { x: centroX - anchoLineaFirma / 2, y: yLineasFirmas },
+      end: { x: centroX + anchoLineaFirma / 2, y: yLineasFirmas },
+      thickness: 1,
+      color: colorBorde,
+    })
+
+    // C. Nombre del firmante centrado en su columna
+    let sizeNombre = 10
+    let wNombre = fontBold.widthOfTextAtSize(nombre, sizeNombre)
+    if (wNombre > anchoLineaFirma + 10) {
+      sizeNombre = 8.5
+      wNombre = fontBold.widthOfTextAtSize(nombre, sizeNombre)
+    }
+    page.drawText(nombre, {
+      x: centroX - wNombre / 2,
+      y: yLineasFirmas - 15,
+      size: sizeNombre,
+      font: fontBold,
+      color: colorOscuro,
+    })
+
+    // D. Cargo del firmante centrado en su columna
+    let sizeCargo = 8.5
+    let wCargo = fontRegular.widthOfTextAtSize(cargo, sizeCargo)
+    if (wCargo > anchoLineaFirma + 20) {
+      sizeCargo = 7.5
+      wCargo = fontRegular.widthOfTextAtSize(cargo, sizeCargo)
+    }
+    page.drawText(cargo, {
+      x: centroX - wCargo / 2,
+      y: yLineasFirmas - 27,
+      size: sizeCargo,
+      font: fontRegular,
+      color: colorGris,
     })
   }
 
-  page.drawLine({
-    start: { x: centroFirma1 - anchoLineaFirma / 2, y: yLineasFirmas },
-    end: { x: centroFirma1 + anchoLineaFirma / 2, y: yLineasFirmas },
-    thickness: 1,
-    color: colorBorde,
-  })
-
-  const nombreDecano = datos.nombreDecano || 'Ing. Roberto Gómez'
-  const wNombreDecano = fontBold.widthOfTextAtSize(nombreDecano, 10)
-  page.drawText(nombreDecano, {
-    x: centroFirma1 - wNombreDecano / 2,
-    y: yTextoNombre,
-    size: 10,
-    font: fontBold,
-    color: colorOscuro,
-  })
-
-  const cargoDecano = datos.cargoDecano || 'Decano Facultad de Ciencias e Ingenierías'
-  const wCargoDecano = fontRegular.widthOfTextAtSize(cargoDecano, 8.5)
-  page.drawText(cargoDecano, {
-    x: centroFirma1 - wCargoDecano / 2,
-    y: yTextoCargo,
-    size: 8.5,
-    font: fontRegular,
-    color: colorGris,
-  })
-
-  // --- Firma 2: Director de Programa o Coordinador Docente (Derecha) ---
-  const centroFirma2 = width - 230
-
-  const firmaDirectorImg = await cargarEIncrustarImagen(pdfDoc, datos.firmaDirectorUrl)
-  if (firmaDirectorImg) {
-    const firmaW = 85
-    const firmaH = 38
-    page.drawImage(firmaDirectorImg, {
-      x: centroFirma2 - firmaW / 2,
-      y: yLineasFirmas + 2,
-      width: firmaW,
-      height: firmaH,
-    })
-  }
-
-  page.drawLine({
-    start: { x: centroFirma2 - anchoLineaFirma / 2, y: yLineasFirmas },
-    end: { x: centroFirma2 + anchoLineaFirma / 2, y: yLineasFirmas },
-    thickness: 1,
-    color: colorBorde,
-  })
-
-  const nombreFirmante2 = datos.nombreFirmante2 || 'Comité Académico Docente'
-  const wNombreFirmante2 = fontBold.widthOfTextAtSize(nombreFirmante2, 10)
-  page.drawText(nombreFirmante2, {
-    x: centroFirma2 - wNombreFirmante2 / 2,
-    y: yTextoNombre,
-    size: 10,
-    font: fontBold,
-    color: colorOscuro,
-  })
-
-  const cargoFirmante2 = datos.cargoFirmante2 || 'Coordinación de Formación Continua'
-  const wCargoFirmante2 = fontRegular.widthOfTextAtSize(cargoFirmante2, 8.5)
-  page.drawText(cargoFirmante2, {
-    x: centroFirma2 - wCargoFirmante2 / 2,
-    y: yTextoCargo,
-    size: 8.5,
-    font: fontRegular,
-    color: colorGris,
-  })
+  // Estampar Firma 1 (Izquierda) y Firma 2 (Derecha) perfectamente calibradas en X y en Y
+  await estamparFirmaColumna(centroFirma1, nombreFirma1, cargoFirma1, urlFirma1)
+  await estamparFirmaColumna(centroFirma2, nombreFirma2, cargoFirma2, urlFirma2)
 
   // 9. Serial y Validación de Seguridad en el pie de página
   const serialTexto = `ID de Verificación Oficial: ${datos.asistenciaId || 'UNISINU-CERT-2026'} | Validez Académica Facultad de Ingenierías`

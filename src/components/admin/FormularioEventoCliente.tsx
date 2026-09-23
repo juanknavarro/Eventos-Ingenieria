@@ -39,7 +39,11 @@ interface EventoInicial {
   imagen_central_url: string | null
   sponsors_url: string | null
   certificado_plantilla_url?: string | null
+  escarapela_plantilla_url?: string | null
   horas_academicas?: number | null
+  nombre_firmante_1?: string | null
+  cargo_firmante_1?: string | null
+  firma_organizador_url?: string | null
   firma_director_url?: string | null
   nombre_firmante_2?: string | null
   cargo_firmante_2?: string | null
@@ -338,6 +342,16 @@ export default function FormularioEventoCliente({
               </p>
             </div>
 
+            {/* Plantilla Base / Lienzo Vertical de la Escarapela */}
+            <SelectorRecursoGrafico
+              etiqueta="Lienzo / Imagen de Fondo de la Escarapela (Plantilla Vertical)"
+              descripcion="Plantilla vertical oficial en alta resolución (PNG o JPG) sobre la cual se estamparán el nombre, documento, rol y código QR de acceso."
+              nombreCampoUrl="escarapela_plantilla_url"
+              nombreCampoArchivo="archivo_escarapela_plantilla"
+              valorInicialUrl={eventoInicial?.escarapela_plantilla_url}
+              aspectoRecomendado="Vertical Carnet (90 x 130 mm / 255 x 368 pt)"
+            />
+
             {/* 1. Imagen Central del Evento */}
             <SelectorRecursoGrafico
               etiqueta="Imagen Central Temática del Evento"
@@ -427,6 +441,44 @@ export default function FormularioEventoCliente({
               <span className="text-[10px] text-slate-400">
                 Horas académicas que se imprimirán en el certificado (ej. 4, 8, 20 horas).
               </span>
+            </div>
+
+            {/* Primer Firmante (Principal - Decanatura o Docente Líder) */}
+            <div className="pt-2 border-t border-slate-100 space-y-3">
+              <span className="text-xs font-bold text-slate-700 block">
+                Primer Firmante Institucional (Principal - Decano o Docente Líder)
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-slate-600">Nombre del Primer Firmante</label>
+                  <input
+                    type="text"
+                    name="nombre_firmante_1"
+                    defaultValue={eventoInicial?.nombre_firmante_1 || ''}
+                    placeholder="Ej. Ing. Roberto Gómez (Dejar vacío para usar default)"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-[#0B305B]"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-slate-600">Cargo del Primer Firmante</label>
+                  <input
+                    type="text"
+                    name="cargo_firmante_1"
+                    defaultValue={eventoInicial?.cargo_firmante_1 || ''}
+                    placeholder="Ej. Decano Facultad de Ciencias e Ingenierías"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-[#0B305B]"
+                  />
+                </div>
+              </div>
+
+              <SelectorRecursoGrafico
+                etiqueta="Firma Digital Escaneada (Primer Firmante)"
+                descripcion="Firma con fondo transparente PNG del decano o docente líder (opcional, si se omite usará la firma global institucional)."
+                nombreCampoUrl="firma_organizador_url"
+                nombreCampoArchivo="archivo_firma_organizador"
+                valorInicialUrl={eventoInicial?.firma_organizador_url}
+                aspectoRecomendado="Firma Horizontal (3:1 o 4:1)"
+              />
             </div>
 
             {/* Segundo Firmante (Opcional - Director de Programa o Coordinador) */}

@@ -93,11 +93,15 @@ model Evento {
   logo_universidad_url String?      // URL o ruta al logo oficial de la Universidad del Sinú
   imagen_central_url   String?      // Imagen temática central alusiva al evento
   sponsors_url         String?      // Imagen o franja de patrocinadores oficiales
+  escarapela_plantilla_url String?  // URL de la plantilla base en alta resolución para escarapelas (PNG/JPG vertical)
   
   // Soporte de Certificación Oficial en PDF
   certificado_plantilla_url String?  // URL de la plantilla base en alta resolución (PNG/JPG)
   horas_academicas          Int?     @default(4) // Intensidad horaria certificada (ej. 4, 8, 20 horas)
-  firma_director_url        String?  // Firma escaneada del docente organizador o director de programa
+  nombre_firmante_1         String?  // Nombre del primer firmante (Decano o Docente Principal)
+  cargo_firmante_1          String?  // Cargo del primer firmante
+  firma_organizador_url     String?  // Firma escaneada del primer firmante
+  firma_director_url        String?  // Firma escaneada del segundo firmante
   nombre_firmante_2         String?  // Nombre del segundo firmante
   cargo_firmante_2          String?  // Cargo del segundo firmante
 

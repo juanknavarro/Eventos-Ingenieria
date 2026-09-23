@@ -399,7 +399,7 @@ export default function ControlAsistenciaCliente({
               {/* Tarjeta de Información del Estudiante Identificado */}
               {ultimoResultado.usuario && (
                 <div className="bg-black/25 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/20 space-y-3 mt-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                     <div>
                       <span className="text-[10px] font-bold text-white/70 uppercase">
                         Estudiante
@@ -407,30 +407,23 @@ export default function ControlAsistenciaCliente({
                       <p className="font-extrabold text-white text-sm">
                         {ultimoResultado.usuario.nombre}
                       </p>
-                      <p className="text-white/80 font-mono">
-                        Cód: {ultimoResultado.usuario.codigoEstudiantil ?? 'Sin código'}
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-bold text-white/70 uppercase">
+                        Documento / Código
+                      </span>
+                      <p className="font-bold text-white font-mono text-sm">
+                        {ultimoResultado.usuario.codigoEstudiantil ?? 'Sin código'}
                       </p>
                     </div>
 
                     <div>
                       <span className="text-[10px] font-bold text-white/70 uppercase">
-                        Carrera / Facultad
+                        Carrera / Programa
                       </span>
-                      <p className="font-bold text-white">
-                        {ultimoResultado.usuario.carrera ?? 'Ingeniería'}
-                      </p>
-                      <p className="text-white/80 truncate">
-                        {ultimoResultado.usuario.email}
-                      </p>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold text-white/70 uppercase">
-                        Bonificación Académica
-                      </span>
-                      <p className="font-bold text-amber-200 flex items-center gap-1">
-                        <BookOpen className="w-3.5 h-3.5 shrink-0" />
-                        {ultimoResultado.inscripcion?.asignatura_bonificacion || 'Sin bonificación'}
+                      <p className="font-bold text-white text-sm">
+                        {ultimoResultado.usuario.carrera ?? 'Facultad de Ingenierías'}
                       </p>
                     </div>
                   </div>
