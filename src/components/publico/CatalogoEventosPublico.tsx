@@ -21,6 +21,10 @@ import {
   ShieldCheck,
   GraduationCap,
   Phone,
+  CalendarX,
+  Building2,
+  Award,
+  Globe,
 } from 'lucide-react'
 import { preinscribirAlumno, verificarCedulaInscrita } from '@/actions/preinscripcion'
 
@@ -97,15 +101,24 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
   const [filtroBusqueda, setFiltroBusqueda] = useState('')
 
   // Estados del formulario del Modal/Slide-over
+  const [tipoVinculacion, setTipoVinculacion] = useState<'ESTUDIANTE_ACTIVO' | 'EGRESADO' | 'EXTERNO'>('ESTUDIANTE_ACTIVO')
   const [cedulaInput, setCedulaInput] = useState('')
   const [nombreInput, setNombreInput] = useState('')
   const [celularInput, setCelularInput] = useState('')
   const [emailInput, setEmailInput] = useState('')
+  
+  // Campos específicos Estudiante / Egresado
   const [carreraInput, setCarreraInput] = useState(PROGRAMAS_ACADEMICOS[0])
   const [semestreInput, setSemestreInput] = useState('6to Semestre')
   const [asignaturaInput, setAsignaturaInput] = useState(
     asignaturas.length > 0 ? asignaturas[0].nombre : ASIGNATURAS_FALLBACK[0]
   )
+
+  // Campos específicos Egresado / Externo
+  const [empresaInput, setEmpresaInput] = useState('')
+  const [paisInput, setPaisInput] = useState('Colombia')
+  const [departamentoInput, setDepartamentoInput] = useState('')
+  const [ciudadInput, setCiudadInput] = useState('')
 
   // Agrupamiento dinámico de asignaturas por programa académico
   const asignaturasAgrupadas = React.useMemo(() => {
@@ -144,6 +157,7 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
   // Abrir Modal de Preinscripción
   const handleAbrirPreinscripcion = (evento: EventoPublico) => {
     setEventoSeleccionado(evento)
+    setTipoVinculacion('ESTUDIANTE_ACTIVO')
     setCedulaInput('')
     setNombreInput('')
     setCelularInput('')
@@ -153,6 +167,10 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
     setAsignaturaInput(
       asignaturas.length > 0 ? asignaturas[0].nombre : ASIGNATURAS_FALLBACK[0]
     )
+    setEmpresaInput('')
+    setPaisInput('Colombia')
+    setDepartamentoInput('')
+    setCiudadInput('')
     setAlertaCedulaDuplicada(null)
     setMensajeErrorServidor(null)
     setPreinscripcionExitosa(null)
@@ -204,6 +222,7 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
     try {
       const formData = new FormData(e.currentTarget)
       formData.set('eventoId', eventoSeleccionado.id)
+      formData.set('tipo_vinculacion', tipoVinculacion)
 
       const res = await preinscribirAlumno(formData)
 
@@ -289,6 +308,13 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
               ? Math.max(0, evento.capacidadMaxima - evento._count.inscripciones)
               : null
 
+            // Control de Vigencia y Aforo
+            const ahora = new Date()
+            const fechaLimite = new Date(evento.fechaFin || evento.fechaInicio)
+            const esExpirado = fechaLimite < ahora
+            const esAgotado =
+              evento.capacidadMaxima !== null && evento._count.inscripciones >= evento.capacidadMaxima
+
             return (
               <div
                 key={evento.id}
@@ -305,8 +331,18 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
 
-                    {/* Insignia de Precio */}
-                    <div className="absolute top-3 right-3">
+                    {/* Insignia de Precio y Estado */}
+                    <div className="absolute top-3 right-3 flex items-center gap-1.5">
+                      {esExpirado && (
+                        <span className="text-[10px] font-black px-2.5 py-1 rounded-xl shadow-md bg-slate-900/90 text-slate-200 border border-white/20">
+                          Finalizado
+                        </span>
+                      )}
+                      {!esExpirado && esAgotado && (
+                        <span className="text-[10px] font-black px-2.5 py-1 rounded-xl shadow-md bg-amber-600/90 text-white border border-white/20">
+                          Agotado
+                        </span>
+                      )}
                       <span
                         className={`text-xs font-black px-3 py-1.5 rounded-xl shadow-md backdrop-blur-md ${
                           evento.precio === 0
@@ -367,17 +403,37 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
                   </div>
                 </div>
 
-                {/* 2) Botón Primario Destacado: 'Preinscribirme' */}
+                {/* 2) Botón de Acción con Candados Visuales */}
                 <div className="p-5 sm:p-6 pt-0">
-                  <button
-                    type="button"
-                    onClick={() => handleAbrirPreinscripcion(evento)}
-                    className="w-full py-3 px-4 bg-[#D2202E] hover:bg-[#B01824] text-white font-extrabold text-xs rounded-2xl shadow-md shadow-[#D2202E]/25 hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer group/btn"
-                  >
-                    <Sparkles className="w-4 h-4 group-hover/btn:rotate-12 transition-transform" />
-                    Preinscribirme al Evento
-                    <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
-                  </button>
+                  {esExpirado ? (
+                    <button
+                      type="button"
+                      disabled
+                      className="w-full py-3 px-4 bg-slate-100 border border-slate-200 text-slate-400 font-extrabold text-xs rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed shadow-none"
+                    >
+                      <CalendarX className="w-4 h-4 text-slate-400 shrink-0" />
+                      Inscripciones Cerradas
+                    </button>
+                  ) : esAgotado ? (
+                    <button
+                      type="button"
+                      disabled
+                      className="w-full py-3 px-4 bg-amber-50 border border-amber-300 text-amber-800 font-extrabold text-xs rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed shadow-none"
+                    >
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                      Aforo Completo
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleAbrirPreinscripcion(evento)}
+                      className="w-full py-3 px-4 bg-[#D2202E] hover:bg-[#B01824] text-white font-extrabold text-xs rounded-2xl shadow-md shadow-[#D2202E]/25 hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer group/btn"
+                    >
+                      <Sparkles className="w-4 h-4 group-hover/btn:rotate-12 transition-transform" />
+                      Preinscribirme al Evento
+                      <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
+                    </button>
+                  )}
                 </div>
               </div>
             )
@@ -435,7 +491,7 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
                 {/* Resumen del Alumno */}
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-left text-xs space-y-1.5 text-slate-700">
                   <div className="flex justify-between">
-                    <span className="text-slate-500">Estudiante:</span>
+                    <span className="text-slate-500">Participante:</span>
                     <span className="font-bold text-slate-900">{preinscripcionExitosa.nombreAlumno}</span>
                   </div>
                   <div className="flex justify-between">
@@ -507,6 +563,57 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
                   </div>
                 )}
 
+                {/* 1. Selector Principal: Tipo de Vinculación */}
+                <div className="space-y-1.5">
+                  <label className="font-bold text-slate-800 flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-1">
+                      Tipo de Vinculación <span className="text-[#D2202E]">*</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      Selecciona tu perfil institucional
+                    </span>
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTipoVinculacion('ESTUDIANTE_ACTIVO')}
+                      className={`py-2 px-2 rounded-2xl border text-center font-bold text-xs transition flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer ${
+                        tipoVinculacion === 'ESTUDIANTE_ACTIVO'
+                          ? 'bg-[#0B305B] text-white border-[#0B305B] shadow-md ring-2 ring-[#0B305B]/20'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <GraduationCap className="w-4 h-4 shrink-0 text-[#D2202E]" />
+                      <span className="truncate">Estudiante</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTipoVinculacion('EGRESADO')}
+                      className={`py-2 px-2 rounded-2xl border text-center font-bold text-xs transition flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer ${
+                        tipoVinculacion === 'EGRESADO'
+                          ? 'bg-[#0B305B] text-white border-[#0B305B] shadow-md ring-2 ring-[#0B305B]/20'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <Award className="w-4 h-4 shrink-0 text-amber-400" />
+                      <span className="truncate">Egresado</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTipoVinculacion('EXTERNO')}
+                      className={`py-2 px-2 rounded-2xl border text-center font-bold text-xs transition flex flex-col sm:flex-row items-center justify-center gap-1.5 cursor-pointer ${
+                        tipoVinculacion === 'EXTERNO'
+                          ? 'bg-[#0B305B] text-white border-[#0B305B] shadow-md ring-2 ring-[#0B305B]/20'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <Building2 className="w-4 h-4 shrink-0 text-sky-400" />
+                      <span className="truncate">Externo</span>
+                    </button>
+                  </div>
+                  <input type="hidden" name="tipo_vinculacion" value={tipoVinculacion} />
+                </div>
+
                 <div className="space-y-4">
                   {/* Cédula de Ciudadanía con Validación en Vivo */}
                   <div className="space-y-1">
@@ -547,7 +654,7 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
                   {/* Nombre Completo */}
                   <div className="space-y-1">
                     <label className="font-bold text-slate-800 flex items-center gap-1">
-                      Nombre Completo del Estudiante <span className="text-[#D2202E]">*</span>
+                      Nombre Completo del Participante <span className="text-[#D2202E]">*</span>
                     </label>
                     <input
                       type="text"
@@ -583,7 +690,7 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
 
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
-                        <label className="font-bold text-slate-800">Correo Institucional</label>
+                        <label className="font-bold text-slate-800">Correo Electrónico</label>
                         <span className="text-[10px] text-slate-400">Opcional</span>
                       </div>
                       <input
@@ -598,87 +705,229 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
                     </div>
                   </div>
 
-                  {/* Programa Académico y Semestre */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="font-bold text-slate-800 flex items-center gap-1">
-                        Programa Académico <span className="text-[#D2202E]">*</span>
-                      </label>
-                      <select
-                        name="carrera"
-                        value={carreraInput}
-                        onChange={(e) => setCarreraInput(e.target.value)}
-                        required
-                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none text-xs font-semibold text-slate-800 cursor-pointer"
-                      >
-                        {PROGRAMAS_ACADEMICOS.map((prog) => (
-                          <option key={prog} value={prog}>
-                            {prog}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  {/* 2. Bloque Expansible Diferenciado con fondo gris sutil */}
+                  <div className="p-4 sm:p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-4 animate-in fade-in transition-all">
+                    {tipoVinculacion === 'ESTUDIANTE_ACTIVO' && (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-xs font-bold text-[#0B305B] border-b border-slate-200/80 pb-2">
+                          <GraduationCap className="w-4 h-4 text-[#D2202E]" />
+                          <span>Información Académica (Estudiante Activo)</span>
+                        </div>
 
-                    <div className="space-y-1">
-                      <label className="font-bold text-slate-800 flex items-center gap-1">
-                        Semestre Actual <span className="text-[#D2202E]">*</span>
-                      </label>
-                      <select
-                        name="semestre"
-                        value={semestreInput}
-                        onChange={(e) => setSemestreInput(e.target.value)}
-                        required
-                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none text-xs font-semibold text-slate-800 cursor-pointer"
-                      >
-                        {SEMESTRES.map((sem) => (
-                          <option key={sem} value={sem}>
-                            {sem}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
+                        {/* Programa Académico y Semestre */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="font-bold text-slate-800 flex items-center gap-1">
+                              Programa Académico <span className="text-[#D2202E]">*</span>
+                            </label>
+                            <select
+                              name="carrera"
+                              value={carreraInput}
+                              onChange={(e) => setCarreraInput(e.target.value)}
+                              required
+                              className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#0B305B] rounded-xl outline-none text-xs font-semibold text-slate-800 cursor-pointer"
+                            >
+                              {PROGRAMAS_ACADEMICOS.map((prog) => (
+                                <option key={prog} value={prog}>
+                                  {prog}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
 
-                  {/* 3) Asignatura de interés consumiendo la tabla Asignaturas agrupada */}
-                  <div className="space-y-1">
-                    <label className="font-bold text-slate-800 flex items-center gap-1">
-                      <BookOpen className="w-3.5 h-3.5 text-[#0B305B]" />
-                      Asignatura de Interés Académico <span className="text-[#D2202E]">*</span>
-                    </label>
-                    <select
-                      name="asignatura_bonificacion"
-                      value={asignaturaInput}
-                      onChange={(e) => setAsignaturaInput(e.target.value)}
-                      required
-                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none text-xs font-bold text-[#0B305B] cursor-pointer"
-                    >
-                      <option value="">-- Selecciona una Asignatura Activa --</option>
-                      {asignaturasAgrupadas.length > 0 ? (
-                        asignaturasAgrupadas.map(([programa, lista]) => (
-                          <optgroup key={programa} label={programa}>
-                            {lista.map((asig) => (
-                              <option key={asig.id} value={asig.nombre}>
-                                {asig.nombre}
+                          <div className="space-y-1">
+                            <label className="font-bold text-slate-800 flex items-center gap-1">
+                              Semestre Actual <span className="text-[#D2202E]">*</span>
+                            </label>
+                            <select
+                              name="semestre"
+                              value={semestreInput}
+                              onChange={(e) => setSemestreInput(e.target.value)}
+                              required
+                              className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#0B305B] rounded-xl outline-none text-xs font-semibold text-slate-800 cursor-pointer"
+                            >
+                              {SEMESTRES.map((sem) => (
+                                <option key={sem} value={sem}>
+                                  {sem}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Asignatura de interés */}
+                        <div className="space-y-1">
+                          <label className="font-bold text-slate-800 flex items-center gap-1">
+                            <BookOpen className="w-3.5 h-3.5 text-[#0B305B]" />
+                            Asignatura de Interés Académico <span className="text-[#D2202E]">*</span>
+                          </label>
+                          <select
+                            name="asignatura_bonificacion"
+                            value={asignaturaInput}
+                            onChange={(e) => setAsignaturaInput(e.target.value)}
+                            required
+                            className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#0B305B] rounded-xl outline-none text-xs font-bold text-[#0B305B] cursor-pointer"
+                          >
+                            <option value="">-- Selecciona una Asignatura Activa --</option>
+                            {asignaturasAgrupadas.length > 0 ? (
+                              asignaturasAgrupadas.map(([programa, lista]) => (
+                                <optgroup key={programa} label={programa}>
+                                  {lista.map((asig) => (
+                                    <option key={asig.id} value={asig.nombre}>
+                                      {asig.nombre}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              ))
+                            ) : (
+                              ASIGNATURAS_FALLBACK.map((asig) => (
+                                <option key={asig} value={asig}>
+                                  {asig}
+                                </option>
+                              ))
+                            )}
+                            <optgroup label="Opciones Generales">
+                              <option value="No aplica / Formación General">
+                                No aplica / Formación General
+                              </option>
+                            </optgroup>
+                          </select>
+                          <p className="text-[10px] text-slate-400">
+                            Materia o área académica vinculada a tu participación en el evento.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {tipoVinculacion === 'EGRESADO' && (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-xs font-bold text-[#0B305B] border-b border-slate-200/80 pb-2">
+                          <Award className="w-4 h-4 text-amber-500" />
+                          <span>Información de Egresado Unisinú</span>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="font-bold text-slate-800 flex items-center gap-1">
+                            Programa Académico de Egreso <span className="text-[#D2202E]">*</span>
+                          </label>
+                          <select
+                            name="carrera"
+                            value={carreraInput}
+                            onChange={(e) => setCarreraInput(e.target.value)}
+                            required
+                            className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#0B305B] rounded-xl outline-none text-xs font-semibold text-slate-800 cursor-pointer"
+                          >
+                            {PROGRAMAS_ACADEMICOS.map((prog) => (
+                              <option key={prog} value={prog}>
+                                {prog}
                               </option>
                             ))}
-                          </optgroup>
-                        ))
-                      ) : (
-                        ASIGNATURAS_FALLBACK.map((asig) => (
-                          <option key={asig} value={asig}>
-                            {asig}
-                          </option>
-                        ))
-                      )}
-                      <optgroup label="Opciones Generales">
-                        <option value="No aplica / Formación General">
-                          No aplica / Formación General
-                        </option>
-                      </optgroup>
-                    </select>
-                    <p className="text-[10px] text-slate-400">
-                      Materia o área académica vinculada a tu participación en el evento.
-                    </p>
+                          </select>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <label className="font-bold text-slate-800 flex items-center gap-1">
+                              <Building2 className="w-3.5 h-3.5 text-slate-500" />
+                              Empresa u Ocupación Actual
+                            </label>
+                            <input
+                              type="text"
+                              name="empresa"
+                              value={empresaInput}
+                              onChange={(e) => setEmpresaInput(e.target.value)}
+                              placeholder="Ej. Empresa, Entidad o Independiente"
+                              className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#0B305B] rounded-xl outline-none text-xs transition"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="font-bold text-slate-800 flex items-center gap-1">
+                              <MapPin className="w-3.5 h-3.5 text-slate-500" />
+                              Ciudad de Residencia
+                            </label>
+                            <input
+                              type="text"
+                              name="ciudad"
+                              value={ciudadInput}
+                              onChange={(e) => setCiudadInput(e.target.value)}
+                              placeholder="Ej. Montería, Medellín, Bogotá"
+                              className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#0B305B] rounded-xl outline-none text-xs transition"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {tipoVinculacion === 'EXTERNO' && (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-xs font-bold text-[#0B305B] border-b border-slate-200/80 pb-2">
+                          <Building2 className="w-4 h-4 text-sky-600" />
+                          <span>Procedencia Institucional y Ubicación (Externo)</span>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="font-bold text-slate-800 flex items-center gap-1">
+                            Empresa, Institución u Organización <span className="text-[#D2202E]">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            name="empresa"
+                            value={empresaInput}
+                            onChange={(e) => setEmpresaInput(e.target.value)}
+                            required
+                            placeholder="Ej. Gobernación, Universidad X, Independiente"
+                            className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#0B305B] rounded-xl outline-none text-xs transition"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="space-y-1">
+                            <label className="font-bold text-slate-800 flex items-center gap-1">
+                              <Globe className="w-3.5 h-3.5 text-slate-500" />
+                              País
+                            </label>
+                            <input
+                              type="text"
+                              name="pais"
+                              value={paisInput}
+                              onChange={(e) => setPaisInput(e.target.value)}
+                              placeholder="Colombia"
+                              className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#0B305B] rounded-xl outline-none text-xs transition"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="font-bold text-slate-800 flex items-center gap-1">
+                              Departamento / Estado
+                            </label>
+                            <input
+                              type="text"
+                              name="departamento"
+                              value={departamentoInput}
+                              onChange={(e) => setDepartamentoInput(e.target.value)}
+                              placeholder="Ej. Córdoba, Antioquia"
+                              className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#0B305B] rounded-xl outline-none text-xs transition"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="font-bold text-slate-800 flex items-center gap-1">
+                              Ciudad <span className="text-[#D2202E]">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              name="ciudad"
+                              value={ciudadInput}
+                              onChange={(e) => setCiudadInput(e.target.value)}
+                              required
+                              placeholder="Ej. Montería, Bogotá"
+                              className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#0B305B] rounded-xl outline-none text-xs transition"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 

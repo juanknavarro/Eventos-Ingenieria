@@ -13,6 +13,13 @@ export interface ConfiguracionPlantillasData {
   horas_academicas_default?: number
   titulo_convocatoria: string
   descripcion_convocatoria: string
+  caracteristica_1?: string | null
+  caracteristica_2?: string | null
+  caracteristica_3?: string | null
+  contacto_correo?: string | null
+  contacto_telefono?: string | null
+  contacto_ubicacion?: string | null
+  contacto_horario?: string | null
   updatedAt?: Date
 }
 
@@ -29,6 +36,13 @@ export const CONFIG_PLANTILLAS_DEFAULT: ConfiguracionPlantillasData = {
   titulo_convocatoria: 'Convocatoria Académica Abierta',
   descripcion_convocatoria:
     'Explora la oferta académica de la Universidad del Sinú. Inscríbete con tu número de documento, asegura tu cupo y expande tus conocimientos en nuestros espacios de formación continua.',
+  caracteristica_1: 'Carnetización Oficial',
+  caracteristica_2: 'Formación Continua',
+  caracteristica_3: 'Certificado Digital con QR',
+  contacto_correo: 'ingenierias@unisinu.edu.co',
+  contacto_telefono: '(+57) 604 784 0340 • Ext. 140 / 142',
+  contacto_ubicacion: 'Campus Santillana, Bloque 3 • Montería, Córdoba',
+  contacto_horario: 'Lunes a Viernes: 8:00 AM – 12:00 M / 2:00 PM – 6:00 PM',
 }
 
 /**
@@ -52,7 +66,14 @@ export async function obtenerConfiguracionPlantillas(): Promise<ConfiguracionPla
           color_secundario: CONFIG_PLANTILLAS_DEFAULT.color_secundario,
           titulo_convocatoria: CONFIG_PLANTILLAS_DEFAULT.titulo_convocatoria,
           descripcion_convocatoria: CONFIG_PLANTILLAS_DEFAULT.descripcion_convocatoria,
-        },
+          caracteristica_1: CONFIG_PLANTILLAS_DEFAULT.caracteristica_1,
+          caracteristica_2: CONFIG_PLANTILLAS_DEFAULT.caracteristica_2,
+          caracteristica_3: CONFIG_PLANTILLAS_DEFAULT.caracteristica_3,
+          contacto_correo: CONFIG_PLANTILLAS_DEFAULT.contacto_correo,
+          contacto_telefono: CONFIG_PLANTILLAS_DEFAULT.contacto_telefono,
+          contacto_ubicacion: CONFIG_PLANTILLAS_DEFAULT.contacto_ubicacion,
+          contacto_horario: CONFIG_PLANTILLAS_DEFAULT.contacto_horario,
+        } as any,
       })
     }
 

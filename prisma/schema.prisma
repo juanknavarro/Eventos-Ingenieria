@@ -49,6 +49,12 @@ enum MetodoPago {
   TRANSFERENCIA
 }
 
+enum TipoVinculacion {
+  ESTUDIANTE_ACTIVO
+  EGRESADO
+  EXTERNO
+}
+
 // ==========================================
 // MODELS
 // ==========================================
@@ -66,6 +72,14 @@ model Usuario {
   programaId        String?
   programa          Programa?   @relation(fields: [programaId], references: [id], onDelete: SetNull)
   semestre          String?     // Ej. "8vo Semestre", "6to Semestre"
+  
+  // Campos de perfil de vinculación
+  tipo_vinculacion  TipoVinculacion? @default(ESTUDIANTE_ACTIVO)
+  empresa           String?
+  pais              String?          @default("Colombia")
+  departamento      String?
+  ciudad            String?
+
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
 
@@ -126,6 +140,11 @@ model Inscripcion {
   
   // Campos solicitados específicamente para gestión académica y financiera
   celular                     String?    // Teléfono celular del estudiante para contacto y confirmación
+  tipo_vinculacion            TipoVinculacion? @default(ESTUDIANTE_ACTIVO)
+  empresa                     String?    // Empresa o entidad de procedencia
+  pais                        String?    @default("Colombia") // País de procedencia
+  departamento                String?    // Departamento/Estado
+  ciudad                      String?    // Ciudad de residencia o procedencia
   asignatura_bonificacion     String?    // Asignatura donde se aplicará la bonificación académica
   profesor_responsable_dinero String?    // Nombre/descripción del docente encargado de recaudar/validar
   profesorResponsableId       String?    // Relación referencial opcional al usuario docente
@@ -182,6 +201,17 @@ model ConfiguracionPlantillas {
   // Textos dinámicos de la convocatoria en la página principal pública
   titulo_convocatoria      String   @default("Convocatoria Académica Abierta")
   descripcion_convocatoria String   @default("Explora la oferta académica de la Universidad del Sinú. Inscríbete con tu número de documento, asegura tu cupo y expande tus conocimientos en nuestros espacios de formación continua.")
+
+  // Píldoras / Características destacadas en el banner del portal público
+  caracteristica_1 String? @default("Carnetización Oficial")
+  caracteristica_2 String? @default("Formación Continua")
+  caracteristica_3 String? @default("Certificado Digital con QR")
+
+  // Canales de Atención y Contacto Institucional (Portal Público)
+  contacto_correo    String?  @default("ingenierias@unisinu.edu.co")
+  contacto_telefono  String?  @default("(+57) 604 784 0340 • Ext. 140 / 142")
+  contacto_ubicacion String?  @default("Campus Santillana, Bloque 3 • Montería, Córdoba")
+  contacto_horario   String?  @default("Lunes a Viernes: 8:00 AM – 12:00 M / 2:00 PM – 6:00 PM")
 
   updatedAt        DateTime @updatedAt
   createdAt        DateTime @default(now())

@@ -49,7 +49,15 @@ export default async function HomePage() {
       {/* ========================================================================= */}
       {/* HEADER INSTITUCIONAL UNISINÚ (NAVBAR PÚBLICO) */}
       {/* ========================================================================= */}
-      <NavbarPublico sesion={sesion} />
+      <NavbarPublico
+        sesion={sesion}
+        contacto={{
+          correo: configPlantillas?.contacto_correo,
+          telefono: configPlantillas?.contacto_telefono,
+          ubicacion: configPlantillas?.contacto_ubicacion,
+          horario: configPlantillas?.contacto_horario,
+        }}
+      />
 
       {/* ========================================================================= */}
       {/* HERO SECTION DE BIENVENIDA A LOS ESTUDIANTES */}
@@ -74,15 +82,15 @@ export default async function HomePage() {
             <div className="pt-2 flex items-center gap-3 flex-wrap">
               <div className="flex items-center gap-2 text-xs text-slate-300 font-semibold bg-white/10 px-3.5 py-2 rounded-xl border border-white/15">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                Carnetización Oficial
+                {configPlantillas?.caracteristica_1 || 'Carnetización Oficial'}
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-300 font-semibold bg-white/10 px-3.5 py-2 rounded-xl border border-white/15">
                 <BookOpen className="w-4 h-4 text-[#F6CDD1]" />
-                Formación Continua
+                {configPlantillas?.caracteristica_2 || 'Formación Continua'}
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-300 font-semibold bg-white/10 px-3.5 py-2 rounded-xl border border-white/15">
                 <Award className="w-4 h-4 text-amber-300" />
-                Certificado Digital con QR
+                {configPlantillas?.caracteristica_3 || 'Certificado Digital con QR'}
               </div>
             </div>
           </div>

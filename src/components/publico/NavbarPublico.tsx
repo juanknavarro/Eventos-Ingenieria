@@ -22,15 +22,28 @@ import {
 import BotonCerrarSesion from '@/components/auth/BotonCerrarSesion'
 import type { AuthSessionUser } from '@/lib/auth/session'
 
-interface NavbarPublicoProps {
-  sesion: AuthSessionUser | null
+export interface ContactoInfo {
+  correo?: string | null
+  telefono?: string | null
+  ubicacion?: string | null
+  horario?: string | null
 }
 
-export default function NavbarPublico({ sesion }: NavbarPublicoProps) {
+interface NavbarPublicoProps {
+  sesion: AuthSessionUser | null
+  contacto?: ContactoInfo | null
+}
+
+export default function NavbarPublico({ sesion, contacto }: NavbarPublicoProps) {
   const [modalContactoAbierto, setModalContactoAbierto] = useState(false)
   const [correoCopiado, setCorreoCopiado] = useState(false)
 
-  const correoContacto = 'ingenierias@unisinu.edu.co'
+  const correoContacto = contacto?.correo?.trim() || 'ingenierias@unisinu.edu.co'
+  const telefonoContacto = contacto?.telefono?.trim() || '(+57) 604 784 0340 • Ext. 140 / 142'
+  const ubicacionContacto =
+    contacto?.ubicacion?.trim() || 'Campus Santillana, Bloque 3 • Montería, Córdoba'
+  const horarioContacto =
+    contacto?.horario?.trim() || 'Lunes a Viernes: 8:00 AM – 12:00 M / 2:00 PM – 6:00 PM'
 
   const copiarCorreo = async () => {
     try {
@@ -258,7 +271,7 @@ export default function NavbarPublico({ sesion }: NavbarPublicoProps) {
                     Conmutador Institucional
                   </span>
                   <p className="font-bold text-slate-900">
-                    (+57) 604 784 0340 &bull; Ext. 140 / 142
+                    {telefonoContacto}
                   </p>
                 </div>
               </div>
@@ -273,7 +286,7 @@ export default function NavbarPublico({ sesion }: NavbarPublicoProps) {
                     Ubicación Decanatura
                   </span>
                   <p className="font-bold text-slate-900">
-                    Campus Santillana, Bloque 3 &bull; Montería, Córdoba
+                    {ubicacionContacto}
                   </p>
                 </div>
               </div>
@@ -288,7 +301,7 @@ export default function NavbarPublico({ sesion }: NavbarPublicoProps) {
                     Horario de Atención
                   </span>
                   <p className="font-bold text-slate-900">
-                    Lunes a Viernes: 8:00 AM &ndash; 12:00 M / 2:00 PM &ndash; 6:00 PM
+                    {horarioContacto}
                   </p>
                 </div>
               </div>

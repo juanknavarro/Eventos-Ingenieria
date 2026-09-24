@@ -52,22 +52,57 @@ export async function preinscribirAlumno(formData: FormData): Promise<Preinscrip
     const nombre = (formData.get('nombre') as string)?.trim()
     const celular = (formData.get('celular') as string)?.trim()
     const emailInput = (formData.get('email') as string)?.trim().toLowerCase()
+
+    // 0. Tipo de vinculación y campos condicionales
+    const tipoVinculacionRaw = (formData.get('tipo_vinculacion') as string)?.trim()
+    const tipo_vinculacion = (['ESTUDIANTE_ACTIVO', 'EGRESADO', 'EXTERNO'].includes(tipoVinculacionRaw)
+      ? tipoVinculacionRaw
+      : 'ESTUDIANTE_ACTIVO') as 'ESTUDIANTE_ACTIVO' | 'EGRESADO' | 'EXTERNO'
+
     const carrera = (formData.get('carrera') as string)?.trim()
     const semestre = (formData.get('semestre') as string)?.trim()
     const asignatura_bonificacion = (formData.get('asignatura_bonificacion') as string)?.trim()
+    const empresa = (formData.get('empresa') as string)?.trim() || null
+    const pais = (formData.get('pais') as string)?.trim() || 'Colombia'
+    const departamento = (formData.get('departamento') as string)?.trim() || null
+    const ciudad = (formData.get('ciudad') as string)?.trim() || null
 
-    // 1. Validaciones básicas de campos obligatorios
+    // 1. Validaciones básicas de campos obligatorios universales
     if (!eventoId) {
       return { success: false, error: 'Identificador de evento no válido.' }
     }
-    if (!cedula || !nombre || !celular || !carrera || !semestre || !asignatura_bonificacion) {
+    if (!cedula || !nombre || !celular) {
       return {
         success: false,
-        error: 'Por favor diligencia todos los campos requeridos del formulario, incluyendo tu teléfono celular.',
+        error: 'Por favor diligencia tu número de identificación, nombre completo y teléfono celular.',
       }
     }
 
-    // 2. Verificar disponibilidad y estado del evento
+    // Validación condicional según el Tipo de Vinculación
+    if (tipo_vinculacion === 'ESTUDIANTE_ACTIVO') {
+      if (!carrera || !semestre || !asignatura_bonificacion) {
+        return {
+          success: false,
+          error: 'Para estudiantes activos es obligatorio diligenciar el programa académico, semestre y la asignatura de interés.',
+        }
+      }
+    } else if (tipo_vinculacion === 'EGRESADO') {
+      if (!carrera) {
+        return {
+          success: false,
+          error: 'Por favor selecciona el programa académico del cual egresaste.',
+        }
+      }
+    } else if (tipo_vinculacion === 'EXTERNO') {
+      if (!empresa || !ciudad) {
+        return {
+          success: false,
+          error: 'Para participantes externos es obligatorio indicar la empresa o entidad de procedencia y la ciudad.',
+        }
+      }
+    }
+
+    // 2. Verificar disponibilidad, vigencia temporal y estado del evento
     const evento = await prisma.evento.findUnique({
       where: { id: eventoId },
       include: {
@@ -84,10 +119,21 @@ export async function preinscribirAlumno(formData: FormData): Promise<Preinscrip
       }
     }
 
+    // Candado de vigencia temporal: si la fecha ya expiró, bloquea la inscripción
+    const ahora = new Date()
+    const fechaLimite = new Date(evento.fechaFin || evento.fechaInicio)
+    if (fechaLimite < ahora) {
+      return {
+        success: false,
+        error: 'Las inscripciones para este evento han finalizado (evento no vigente).',
+      }
+    }
+
+    // Candado de aforo: si ya alcanzó la capacidad máxima, bloquea la inscripción
     if (evento.capacidadMaxima && evento._count.inscripciones >= evento.capacidadMaxima) {
       return {
         success: false,
-        error: 'Los cupos para este evento se encuentran agotados.',
+        error: 'Los cupos para este evento se encuentran agotados (aforo completo).',
       }
     }
 
@@ -126,17 +172,29 @@ export async function preinscribirAlumno(formData: FormData): Promise<Preinscrip
     const emailFinal = emailInput || (usuario ? usuario.email : `${cedula}@unisinu.edu.co`)
 
     if (usuario) {
-      // Actualizar información académica suministrada
+      // Actualizar información suministrada según perfil
+      const datosActualizar: Record<string, unknown> = {
+        nombre: nombre || usuario.nombre,
+        telefono: celular || usuario.telefono,
+        cedula: usuario.cedula || cedula,
+        codigoEstudiantil: usuario.codigoEstudiantil || cedula,
+        tipo_vinculacion,
+        empresa: empresa || usuario.empresa,
+        pais: pais || usuario.pais,
+        departamento: departamento || usuario.departamento,
+        ciudad: ciudad || usuario.ciudad,
+      }
+
+      if (tipo_vinculacion === 'ESTUDIANTE_ACTIVO') {
+        datosActualizar.carrera = carrera || usuario.carrera
+        datosActualizar.semestre = semestre || usuario.semestre
+      } else if (tipo_vinculacion === 'EGRESADO') {
+        datosActualizar.carrera = carrera || usuario.carrera
+      }
+
       usuario = await prisma.usuario.update({
         where: { id: usuario.id },
-        data: {
-          nombre: nombre || usuario.nombre,
-          telefono: celular || usuario.telefono,
-          carrera: carrera || usuario.carrera,
-          semestre: semestre || usuario.semestre,
-          cedula: usuario.cedula || cedula,
-          codigoEstudiantil: usuario.codigoEstudiantil || cedula,
-        },
+        data: datosActualizar,
       })
     } else {
       // Si no existe, verificar si existe un usuario con el mismo email
@@ -145,29 +203,53 @@ export async function preinscribirAlumno(formData: FormData): Promise<Preinscrip
       })
 
       if (usuarioPorEmail) {
+        const datosActualizar: Record<string, unknown> = {
+          nombre,
+          telefono: celular,
+          cedula,
+          codigoEstudiantil: cedula,
+          tipo_vinculacion,
+          empresa,
+          pais,
+          departamento,
+          ciudad,
+        }
+
+        if (tipo_vinculacion === 'ESTUDIANTE_ACTIVO') {
+          datosActualizar.carrera = carrera
+          datosActualizar.semestre = semestre
+        } else if (tipo_vinculacion === 'EGRESADO') {
+          datosActualizar.carrera = carrera
+        }
+
         usuario = await prisma.usuario.update({
           where: { id: usuarioPorEmail.id },
-          data: {
-            nombre,
-            telefono: celular,
-            cedula,
-            codigoEstudiantil: cedula,
-            carrera,
-            semestre,
-          },
+          data: datosActualizar,
         })
       } else {
+        const datosCrear: Record<string, unknown> = {
+          nombre,
+          email: emailFinal,
+          telefono: celular,
+          cedula,
+          codigoEstudiantil: cedula,
+          rol: 'ALUMNO',
+          tipo_vinculacion,
+          empresa,
+          pais,
+          departamento,
+          ciudad,
+        }
+
+        if (tipo_vinculacion === 'ESTUDIANTE_ACTIVO') {
+          datosCrear.carrera = carrera
+          datosCrear.semestre = semestre
+        } else if (tipo_vinculacion === 'EGRESADO') {
+          datosCrear.carrera = carrera
+        }
+
         usuario = await prisma.usuario.create({
-          data: {
-            nombre,
-            email: emailFinal,
-            telefono: celular,
-            cedula,
-            codigoEstudiantil: cedula,
-            rol: 'ALUMNO',
-            carrera,
-            semestre,
-          },
+          data: datosCrear as any,
         })
       }
     }
@@ -195,10 +277,15 @@ export async function preinscribirAlumno(formData: FormData): Promise<Preinscrip
         eventoId,
         usuarioId: usuario.id,
         celular,
-        asignatura_bonificacion,
+        tipo_vinculacion: tipo_vinculacion as any,
+        empresa,
+        pais,
+        departamento,
+        ciudad,
+        asignatura_bonificacion: tipo_vinculacion === 'ESTUDIANTE_ACTIVO' ? asignatura_bonificacion : null,
         estado_pago: 'PENDIENTE',
         montoPagado: 0.0,
-      },
+      } as any,
       include: {
         evento: true,
         usuario: true,

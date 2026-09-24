@@ -35,7 +35,11 @@ export default function BotonCerrarSesion({
     try {
       await cerrarSesion()
     } catch {
+      // Captura de posible interrupción de promesa o excepción de redirección interna
+    } finally {
       setCargando(false)
+      setModalAbierto(false)
+      window.location.href = '/'
     }
   }
 

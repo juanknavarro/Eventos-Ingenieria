@@ -579,6 +579,24 @@ export async function actualizarConfiguracionPlantillas(formData: FormData): Pro
       (formData.get('descripcion_convocatoria') as string)?.trim() ||
       'Explora la oferta académica de la Universidad del Sinú. Inscríbete con tu número de documento, asegura tu cupo y expande tus conocimientos en nuestros espacios de formación continua.'
 
+    const caracteristica1 =
+      (formData.get('caracteristica_1') as string)?.trim() || 'Carnetización Oficial'
+    const caracteristica2 =
+      (formData.get('caracteristica_2') as string)?.trim() || 'Formación Continua'
+    const caracteristica3 =
+      (formData.get('caracteristica_3') as string)?.trim() || 'Certificado Digital con QR'
+
+    const contactoCorreo =
+      (formData.get('contacto_correo') as string)?.trim() || 'ingenierias@unisinu.edu.co'
+    const contactoTelefono =
+      (formData.get('contacto_telefono') as string)?.trim() || '(+57) 604 784 0340 • Ext. 140 / 142'
+    const contactoUbicacion =
+      (formData.get('contacto_ubicacion') as string)?.trim() ||
+      'Campus Santillana, Bloque 3 • Montería, Córdoba'
+    const contactoHorario =
+      (formData.get('contacto_horario') as string)?.trim() ||
+      'Lunes a Viernes: 8:00 AM – 12:00 M / 2:00 PM – 6:00 PM'
+
     // 1. Procesar archivo de logo si fue subido
     const archivoLogo = formData.get('archivo_logo') as File | null
     if (archivoLogo && archivoLogo.size > 0) {
@@ -597,7 +615,7 @@ export async function actualizarConfiguracionPlantillas(formData: FormData): Pro
       }
     }
 
-    await prisma.configuracionPlantillas.upsert({
+    await (prisma.configuracionPlantillas.upsert as any)({
       where: { id: 'global_config' },
       create: {
         id: 'global_config',
@@ -609,6 +627,13 @@ export async function actualizarConfiguracionPlantillas(formData: FormData): Pro
         color_secundario: colorSecundario,
         titulo_convocatoria: tituloConvocatoria,
         descripcion_convocatoria: descripcionConvocatoria,
+        caracteristica_1: caracteristica1,
+        caracteristica_2: caracteristica2,
+        caracteristica_3: caracteristica3,
+        contacto_correo: contactoCorreo,
+        contacto_telefono: contactoTelefono,
+        contacto_ubicacion: contactoUbicacion,
+        contacto_horario: contactoHorario,
       },
       update: {
         logo_url: logoUrl,
@@ -619,6 +644,13 @@ export async function actualizarConfiguracionPlantillas(formData: FormData): Pro
         color_secundario: colorSecundario,
         titulo_convocatoria: tituloConvocatoria,
         descripcion_convocatoria: descripcionConvocatoria,
+        caracteristica_1: caracteristica1,
+        caracteristica_2: caracteristica2,
+        caracteristica_3: caracteristica3,
+        contacto_correo: contactoCorreo,
+        contacto_telefono: contactoTelefono,
+        contacto_ubicacion: contactoUbicacion,
+        contacto_horario: contactoHorario,
       },
     })
 

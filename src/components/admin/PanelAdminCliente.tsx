@@ -31,6 +31,10 @@ import {
   Sparkles,
   Globe,
   Building2,
+  Info,
+  Mail,
+  Phone,
+  Award,
 } from 'lucide-react'
 import { RolUsuario, EstadoEvento } from '@prisma/client'
 import {
@@ -151,6 +155,27 @@ export default function PanelAdminCliente({
   const [descripcionConvocatoriaInput, setDescripcionConvocatoriaInput] = useState(
     configPlantillas?.descripcion_convocatoria ||
       'Explora la oferta académica de la Universidad del Sinú. Inscríbete con tu número de documento, asegura tu cupo y expande tus conocimientos en nuestros espacios de formación continua.'
+  )
+  const [caracteristica1Input, setCaracteristica1Input] = useState(
+    configPlantillas?.caracteristica_1 || 'Carnetización Oficial'
+  )
+  const [caracteristica2Input, setCaracteristica2Input] = useState(
+    configPlantillas?.caracteristica_2 || 'Formación Continua'
+  )
+  const [caracteristica3Input, setCaracteristica3Input] = useState(
+    configPlantillas?.caracteristica_3 || 'Certificado Digital con QR'
+  )
+  const [contactoCorreoInput, setContactoCorreoInput] = useState(
+    configPlantillas?.contacto_correo || 'ingenierias@unisinu.edu.co'
+  )
+  const [contactoTelefonoInput, setContactoTelefonoInput] = useState(
+    configPlantillas?.contacto_telefono || '(+57) 604 784 0340 • Ext. 140 / 142'
+  )
+  const [contactoUbicacionInput, setContactoUbicacionInput] = useState(
+    configPlantillas?.contacto_ubicacion || 'Campus Santillana, Bloque 3 • Montería, Córdoba'
+  )
+  const [contactoHorarioInput, setContactoHorarioInput] = useState(
+    configPlantillas?.contacto_horario || 'Lunes a Viernes: 8:00 AM – 12:00 M / 2:00 PM – 6:00 PM'
   )
 
   const mostrarMensaje = (exito: boolean, texto: string) => {
@@ -457,7 +482,7 @@ export default function PanelAdminCliente({
             }`}
           >
             <FileText className="w-4 h-4" />
-            Configurar Plantillas PDF
+            Configuración Institucional y Fallbacks
           </button>
         )}
 
@@ -760,18 +785,19 @@ export default function PanelAdminCliente({
       )}
 
       {/* ========================================================================= */}
-      {/* PESTAÑA 3: CONFIGURACIÓN DINÁMICA DE PLANTILLAS PDF */}
+      {/* PESTAÑA 3: CONFIGURACIÓN INSTITUCIONAL Y FALLBACKS */}
       {/* ========================================================================= */}
       {tabActiva === 'plantillas' && (
-        <form onSubmit={handleGuardarPlantillas} className="space-y-6">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <form onSubmit={handleGuardarPlantillas} className="max-w-4xl mx-auto flex flex-col gap-6">
+          {/* Encabezado Principal y Botón Guardar */}
+          <div className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-sm font-bold text-[#0B305B] flex items-center gap-2">
-                <Palette className="w-4 h-4 text-[#D2202E]" />
-                Personalización Dinámica de Plantillas PDF (Escarapelas y Certificados)
+              <h2 className="text-base font-bold text-[#0B305B] flex items-center gap-2">
+                <Palette className="w-5 h-5 text-[#D2202E]" />
+                Configuración Institucional y Fallbacks
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Modifica el logo institucional, la firma digital del decano, los datos del firmante y la paleta de colores. Los cambios se aplican en tiempo real en los documentos oficiales.
+              <p className="text-xs text-slate-500 mt-1 max-w-2xl">
+                Define los valores institucionales predeterminados (logo oficial, firmas de respaldo, paleta de colores y textos del portal). Si un evento no define sus propios recursos gráficos, el sistema recurrirá a estos parámetros.
               </p>
             </div>
 
@@ -794,342 +820,548 @@ export default function PanelAdminCliente({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* COLUMNA IZQUIERDA: FORMULARIO DE CONFIGURACIÓN (7 Columnas) */}
-            <div className="lg:col-span-7 space-y-5">
-              {/* Sección 1: Recursos Gráficos Institucionales */}
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <h3 className="font-bold text-xs text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2.5">
-                  <ImageIcon className="w-4 h-4 text-[#0B305B]" />
-                  Recursos Gráficos Institucionales
-                </h3>
+          {/* Banner Informativo Destacado (Alert) */}
+          <div className="p-4 sm:p-5 bg-blue-50/90 border border-blue-200 rounded-2xl flex items-start gap-3.5 text-blue-950 shadow-xs">
+            <Info className="w-5 h-5 text-[#0B305B] shrink-0 mt-0.5" />
+            <div className="text-xs leading-relaxed">
+              <strong className="font-bold text-[#0B305B]">Nota: </strong>
+              Las plantillas gráficas de diplomas y escarapelas se gestionan ahora de forma independiente dentro del formulario de cada Evento. Los datos configurados en este panel operan únicamente como valores predeterminados de respaldo.
+            </div>
+          </div>
 
-                {/* 1. Logo Oficial */}
-                <SelectorRecursoGrafico
-                  etiqueta="Logo Oficial de la Universidad del Sinú"
-                  descripcion="Encabezado de las escarapelas verticales y membrete superior de los certificados."
-                  nombreCampoUrl="logo_url"
-                  nombreCampoArchivo="archivo_logo"
-                  valorInicialUrl={configPlantillas?.logo_url || '/imagen_2.png'}
-                  aspectoRecomendado="Horizontal (4:1 o 5:1)"
+          {/* Tarjeta 1: Recursos Gráficos Institucionales */}
+          <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-sm space-y-5">
+            <div className="border-b border-slate-100 pb-3">
+              <h3 className="font-bold text-xs text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-[#0B305B]" />
+                Recursos Gráficos Institucionales
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Imágenes y firmas institucionales que operan como fallback si un evento no define las suyas.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* 1. Logo Oficial */}
+              <SelectorRecursoGrafico
+                etiqueta="Logo Oficial de la Universidad del Sinú"
+                descripcion="Encabezado de las escarapelas verticales y membrete superior de los certificados."
+                nombreCampoUrl="logo_url"
+                nombreCampoArchivo="archivo_logo"
+                valorInicialUrl={configPlantillas?.logo_url || '/imagen_2.png'}
+                aspectoRecomendado="Horizontal (4:1 o 5:1)"
+              />
+
+              {/* 2. Firma Escaneada del Decano */}
+              <SelectorRecursoGrafico
+                etiqueta="Firma Escaneada del Decano / Autoridad"
+                descripcion="Imagen de la firma estampada sobre la línea de validación en el certificado de asistencia."
+                nombreCampoUrl="firma_decano_url"
+                nombreCampoArchivo="archivo_firma_decano"
+                valorInicialUrl={configPlantillas?.firma_decano_url || ''}
+                aspectoRecomendado="PNG con fondo transparente (2.5:1 o 3:1)"
+              />
+            </div>
+          </div>
+
+          {/* Tarjeta 2: Datos de la Autoridad Firmante */}
+          <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-sm space-y-5">
+            <div className="border-b border-slate-100 pb-3">
+              <h3 className="font-bold text-xs text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <PenTool className="w-4 h-4 text-[#0B305B]" />
+                Datos de la Autoridad Firmante (Primer Firmante por Defecto)
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Titular institucional asignado automáticamente al primer firmante si el evento no especifica uno particular.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Nombre del Firmante</label>
+                <input
+                  type="text"
+                  name="nombre_decano"
+                  value={nombreDecanoInput}
+                  onChange={(e) => setNombreDecanoInput(e.target.value)}
+                  required
+                  placeholder="Ej. Ing. Roberto Gómez o Juan Carlos Navarro"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-bold outline-none transition"
                 />
+              </div>
 
-                {/* 2. Firma Escaneada del Decano */}
-                <SelectorRecursoGrafico
-                  etiqueta="Firma Escaneada del Decano / Autoridad"
-                  descripcion="Imagen de la firma estampada sobre la línea de validación en el certificado de asistencia."
-                  nombreCampoUrl="firma_decano_url"
-                  nombreCampoArchivo="archivo_firma_decano"
-                  valorInicialUrl={configPlantillas?.firma_decano_url || ''}
-                  aspectoRecomendado="PNG con fondo transparente (2.5:1 o 3:1)"
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Cargo / Dependencia</label>
+                <input
+                  type="text"
+                  name="cargo_firmante"
+                  value={cargoFirmanteInput}
+                  onChange={(e) => setCargoFirmanteInput(e.target.value)}
+                  required
+                  placeholder="Ej. Decano Facultad de Ciencias e Ingenierías"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs outline-none transition"
                 />
               </div>
+            </div>
+          </div>
 
-              {/* Sección 2: Datos de la Autoridad Firmante */}
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <h3 className="font-bold text-xs text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2.5">
-                  <PenTool className="w-4 h-4 text-[#0B305B]" />
-                  Datos de la Autoridad Firmante
+          {/* Tarjeta 3: Paleta de Colores de Franjas y Ribetes */}
+          <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-sm space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="font-bold text-xs text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <Palette className="w-4 h-4 text-[#D2202E]" />
+                  Colores Institucionales de Franjas y Bordes
                 </h3>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700">Nombre del Firmante</label>
-                    <input
-                      type="text"
-                      name="nombre_decano"
-                      value={nombreDecanoInput}
-                      onChange={(e) => setNombreDecanoInput(e.target.value)}
-                      required
-                      placeholder="Ej. Ing. Roberto Gómez o Juan Carlos Navarro"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs outline-none transition"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700">Cargo / Dependencia</label>
-                    <input
-                      type="text"
-                      name="cargo_firmante"
-                      value={cargoFirmanteInput}
-                      onChange={(e) => setCargoFirmanteInput(e.target.value)}
-                      required
-                      placeholder="Ej. Decano Facultad de Ciencias e Ingenierías"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs outline-none transition"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Sección 3: Paleta de Colores de Franjas y Ribetes */}
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                  <h3 className="font-bold text-xs text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                    <Palette className="w-4 h-4 text-[#D2202E]" />
-                    Colores Institucionales de Franjas y Bordes
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setColorPrimario('#0B305B')
-                      setColorSecundario('#D2202E')
-                    }}
-                    className="text-[10px] font-bold text-[#0B305B] hover:text-[#D2202E] underline cursor-pointer"
-                  >
-                    Restablecer Unisinú Oficial
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Color Primario */}
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-slate-800">Color Primario</label>
-                      <span className="text-[10px] text-slate-500">Cabecera y Marco Exterior</span>
-                    </div>
-                    <div className="flex items-center gap-2.5">
-                      <input
-                        type="color"
-                        value={colorPrimario}
-                        onChange={(e) => setColorPrimario(e.target.value)}
-                        className="w-10 h-10 rounded-lg border-2 border-white shadow-xs cursor-pointer shrink-0"
-                      />
-                      <input
-                        type="text"
-                        name="color_primario"
-                        value={colorPrimario}
-                        onChange={(e) => setColorPrimario(e.target.value)}
-                        placeholder="#0B305B"
-                        className="w-full px-3 py-2 bg-white border border-slate-200 focus:border-[#0B305B] rounded-xl text-xs font-mono font-bold outline-none uppercase"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Color Secundario */}
-                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-slate-800">Color Secundario / Acento</label>
-                      <span className="text-[10px] text-slate-500">Franja de Evento y Ribete</span>
-                    </div>
-                    <div className="flex items-center gap-2.5">
-                      <input
-                        type="color"
-                        value={colorSecundario}
-                        onChange={(e) => setColorSecundario(e.target.value)}
-                        className="w-10 h-10 rounded-lg border-2 border-white shadow-xs cursor-pointer shrink-0"
-                      />
-                      <input
-                        type="text"
-                        name="color_secundario"
-                        value={colorSecundario}
-                        onChange={(e) => setColorSecundario(e.target.value)}
-                        placeholder="#D2202E"
-                        className="w-full px-3 py-2 bg-white border border-slate-200 focus:border-[#0B305B] rounded-xl text-xs font-mono font-bold outline-none uppercase"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Tarjeta Visual: Textos del Portal Público */}
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                  <h3 className="font-bold text-xs text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                    <Globe className="w-4 h-4 text-[#D2202E]" />
-                    Textos del Portal Público
-                  </h3>
-                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-50 text-[#0B305B] border border-blue-200">
-                    Página Raíz (/)
-                  </span>
-                </div>
-
-                <p className="text-[11px] text-slate-500">
-                  Personaliza los textos informativos principales del banner de bienvenida que los estudiantes ven en el portal público.
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Colores corporativos por defecto para marcos y acentos gráficos en ausencia de plantillas externas.
                 </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setColorPrimario('#0B305B')
+                  setColorSecundario('#D2202E')
+                }}
+                className="text-[11px] font-bold text-[#0B305B] hover:text-[#D2202E] underline cursor-pointer shrink-0"
+              >
+                Restablecer Unisinú Oficial
+              </button>
+            </div>
 
-                <div className="space-y-4">
-                  {/* 1. Input Corto: titulo_convocatoria */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
-                      <span>Título de la Convocatoria</span>
-                      <span className="text-[10px] font-mono text-slate-400">titulo_convocatoria</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="titulo_convocatoria"
-                      value={tituloConvocatoriaInput}
-                      onChange={(e) => setTituloConvocatoriaInput(e.target.value)}
-                      required
-                      placeholder="Ej. Convocatoria Académica Abierta"
-                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-bold text-[#0B305B] outline-none transition"
-                    />
-                    <p className="text-[10px] text-slate-400">
-                      Encabezado destacado que se muestra en el banner superior del portal público.
-                    </p>
-                  </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Color Primario */}
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800">Color Primario</label>
+                  <span className="text-[10px] text-slate-500">Cabecera y Marco Exterior</span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <input
+                    type="color"
+                    value={colorPrimario}
+                    onChange={(e) => setColorPrimario(e.target.value)}
+                    className="w-10 h-10 rounded-lg border-2 border-white shadow-xs cursor-pointer shrink-0"
+                  />
+                  <input
+                    type="text"
+                    name="color_primario"
+                    value={colorPrimario}
+                    onChange={(e) => setColorPrimario(e.target.value)}
+                    placeholder="#0B305B"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 focus:border-[#0B305B] rounded-xl text-xs font-mono font-bold outline-none uppercase"
+                  />
+                </div>
+              </div>
 
-                  {/* 2. Área de Texto (textarea): descripcion_convocatoria */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
-                      <span>Descripción de la Convocatoria</span>
-                      <span className="text-[10px] font-mono text-slate-400">descripcion_convocatoria</span>
-                    </label>
-                    <textarea
-                      name="descripcion_convocatoria"
-                      value={descripcionConvocatoriaInput}
-                      onChange={(e) => setDescripcionConvocatoriaInput(e.target.value)}
-                      required
-                      rows={3}
-                      placeholder="Explora la oferta académica de la Universidad del Sinú..."
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs leading-relaxed outline-none transition"
-                    />
-                    <p className="text-[10px] text-slate-400">
-                      Párrafo descriptivo que orienta a los alumnos sobre el proceso de inscripción y formación continua.
-                    </p>
-                  </div>
-
-                  {/* Botón de Guardar dentro de la Tarjeta */}
-                  <div className="pt-3 flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-slate-100">
-                    <span className="text-[11px] text-slate-500">
-                      Se actualiza directamente en <code className="font-mono text-[#0B305B] font-bold">ConfiguracionPlantillas</code>
-                    </span>
-                    <button
-                      type="submit"
-                      disabled={cargandoAccion}
-                      className="w-full sm:w-auto px-4 py-2 bg-[#0B305B] hover:bg-[#071F3B] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      {cargandoAccion ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          Guardando...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-3.5 h-3.5 text-[#D2202E]" />
-                          Guardar Textos
-                        </>
-                      )}
-                    </button>
-                  </div>
+              {/* Color Secundario */}
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800">Color Secundario / Acento</label>
+                  <span className="text-[10px] text-slate-500">Franja de Evento y Ribete</span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <input
+                    type="color"
+                    value={colorSecundario}
+                    onChange={(e) => setColorSecundario(e.target.value)}
+                    className="w-10 h-10 rounded-lg border-2 border-white shadow-xs cursor-pointer shrink-0"
+                  />
+                  <input
+                    type="text"
+                    name="color_secundario"
+                    value={colorSecundario}
+                    onChange={(e) => setColorSecundario(e.target.value)}
+                    placeholder="#D2202E"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 focus:border-[#0B305B] rounded-xl text-xs font-mono font-bold outline-none uppercase"
+                  />
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* COLUMNA DERECHA: PREVISUALIZACIÓN EN VIVO (5 Columnas) */}
-            <div className="lg:col-span-5 space-y-5">
-              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 sticky top-20">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                  <h3 className="font-bold text-xs text-slate-900 uppercase tracking-wider">
-                    Simulación Visual en Vivo
-                  </h3>
+          {/* Tarjeta 4: Textos del Portal Público y Previsualización Integrada */}
+          <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-sm space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="font-bold text-xs text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-[#D2202E]" />
+                  Textos del Portal Público
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Personaliza los textos informativos principales del banner de bienvenida que los estudiantes ven en el portal público.
+                </p>
+              </div>
+              <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-blue-50 text-[#0B305B] border border-blue-200 shrink-0">
+                Página Raíz (/)
+              </span>
+            </div>
+
+            <div className="space-y-4">
+              {/* 1. Input Corto: titulo_convocatoria */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                  <span>Título de la Convocatoria</span>
+                  <span className="text-[10px] font-mono text-slate-400">titulo_convocatoria</span>
+                </label>
+                <input
+                  type="text"
+                  name="titulo_convocatoria"
+                  value={tituloConvocatoriaInput}
+                  onChange={(e) => setTituloConvocatoriaInput(e.target.value)}
+                  required
+                  placeholder="Ej. Convocatoria Académica Abierta"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-bold text-[#0B305B] outline-none transition"
+                />
+                <p className="text-[10px] text-slate-400">
+                  Encabezado destacado que se muestra en el banner superior del portal público.
+                </p>
+              </div>
+
+              {/* 2. Área de Texto (textarea): descripcion_convocatoria */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                  <span>Descripción de la Convocatoria</span>
+                  <span className="text-[10px] font-mono text-slate-400">descripcion_convocatoria</span>
+                </label>
+                <textarea
+                  name="descripcion_convocatoria"
+                  value={descripcionConvocatoriaInput}
+                  onChange={(e) => setDescripcionConvocatoriaInput(e.target.value)}
+                  required
+                  rows={3}
+                  placeholder="Explora la oferta académica de la Universidad del Sinú..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs leading-relaxed outline-none transition"
+                />
+                <p className="text-[10px] text-slate-400">
+                  Párrafo descriptivo que orienta a los alumnos sobre el proceso de inscripción y formación continua.
+                </p>
+              </div>
+
+              {/* 3. Píldoras / Características Destacadas del Banner */}
+              <div className="pt-2 space-y-2 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-[#0B305B]" />
+                    Píldoras Informativas del Banner (3 Características Destacadas)
+                  </label>
+                  <span className="text-[10px] text-slate-400">Badges de valor</span>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Textos breves que destacan las ventajas de los eventos académicos frente a los estudiantes.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                  {/* Característica 1 */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      Píldora 1
+                    </label>
+                    <input
+                      type="text"
+                      name="caracteristica_1"
+                      value={caracteristica1Input}
+                      onChange={(e) => setCaracteristica1Input(e.target.value)}
+                      required
+                      placeholder="Carnetización Oficial"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-semibold text-slate-800 outline-none transition"
+                    />
+                  </div>
+
+                  {/* Característica 2 */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                      <BookOpen className="w-3.5 h-3.5 text-[#D2202E]" />
+                      Píldora 2
+                    </label>
+                    <input
+                      type="text"
+                      name="caracteristica_2"
+                      value={caracteristica2Input}
+                      onChange={(e) => setCaracteristica2Input(e.target.value)}
+                      required
+                      placeholder="Formación Continua"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-semibold text-slate-800 outline-none transition"
+                    />
+                  </div>
+
+                  {/* Característica 3 */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                      <Award className="w-3.5 h-3.5 text-amber-600" />
+                      Píldora 3
+                    </label>
+                    <input
+                      type="text"
+                      name="caracteristica_3"
+                      value={caracteristica3Input}
+                      onChange={(e) => setCaracteristica3Input(e.target.value)}
+                      required
+                      placeholder="Certificado Digital con QR"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-semibold text-slate-800 outline-none transition"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Previsualización en Vivo Integrada del Banner del Portal Público */}
+              <div className="pt-2 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-[#D2202E]" />
+                    Previsualización en Vivo del Banner (Portal Público):
+                  </span>
                   <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
                     Sincronizado
                   </span>
                 </div>
 
-                {/* Mockup 1: Escarapela Vertical */}
+                <div className="p-4 sm:p-5 bg-gradient-to-r from-[#0B305B] to-[#041224] text-white rounded-2xl border border-slate-300 text-left space-y-2.5 shadow-inner">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 text-[9px] font-bold text-white">
+                    <Sparkles className="w-3 h-3 text-[#D2202E]" />
+                    <span className="line-clamp-1">{tituloConvocatoriaInput || 'Convocatoria Académica Abierta'}</span>
+                  </div>
+                  <div className="text-sm font-black leading-snug line-clamp-1">
+                    {tituloConvocatoriaInput || 'Convocatoria Académica Abierta'}
+                  </div>
+                  <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">
+                    {descripcionConvocatoriaInput || 'Explora la oferta académica de la Universidad del Sinú...'}
+                  </p>
+
+                  {/* Píldoras en vivo en la previsualización */}
+                  <div className="pt-1.5 flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5 text-[9px] text-slate-200 font-bold bg-white/10 px-2.5 py-1 rounded-lg border border-white/15">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                      <span className="truncate max-w-[130px]">{caracteristica1Input || 'Carnetización Oficial'}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[9px] text-slate-200 font-bold bg-white/10 px-2.5 py-1 rounded-lg border border-white/15">
+                      <BookOpen className="w-3 h-3 text-[#F6CDD1] shrink-0" />
+                      <span className="truncate max-w-[130px]">{caracteristica2Input || 'Formación Continua'}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[9px] text-slate-200 font-bold bg-white/10 px-2.5 py-1 rounded-lg border border-white/15">
+                      <Award className="w-3 h-3 text-amber-300 shrink-0" />
+                      <span className="truncate max-w-[130px]">{caracteristica3Input || 'Certificado Digital con QR'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Barra Inferior de Guardado de la Tarjeta */}
+              <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100">
+                <span className="text-[11px] text-slate-500">
+                  Se actualiza directamente en <code className="font-mono text-[#0B305B] font-bold">ConfiguracionPlantillas</code>
+                </span>
+                <button
+                  type="submit"
+                  disabled={cargandoAccion}
+                  className="w-full sm:w-auto px-5 py-2.5 bg-[#0B305B] hover:bg-[#071F3B] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {cargandoAccion ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-3.5 h-3.5 text-[#D2202E]" />
+                      Guardar Configuración
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Tarjeta 5: Información de Contacto Institucional (Modal Público) */}
+          <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-sm space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="font-bold text-xs text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-[#0B305B]" />
+                  Información de Contacto Institucional
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Canales de atención a estudiantes y docentes proyectados en el modal de Contacto del portal público.
+                </p>
+              </div>
+              <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 shrink-0">
+                Modal Público (Navbar)
+              </span>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* 1. Correo Electrónico */}
                 <div className="space-y-1.5">
-                  <span className="text-[11px] font-bold text-slate-700">1. Escarapela Oficial (90 x 130 mm):</span>
-                  <div className="w-56 mx-auto bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden text-center text-[9px]">
-                    {/* Cabecera Color Primario */}
-                    <div
-                      className="p-2 text-white flex items-center justify-between transition-colors"
-                      style={{ backgroundColor: colorPrimario }}
-                    >
-                      <div className="text-left leading-tight">
-                        <span className="font-black text-[10px] block">UNIVERSIDAD DEL SINÚ</span>
-                        <span className="text-[7px] opacity-80">FACULTAD DE INGENIERÍAS</span>
-                      </div>
-                      <span
-                        className="px-1.5 py-0.5 text-[6px] font-black rounded text-white"
-                        style={{ backgroundColor: colorSecundario }}
-                      >
-                        2026
+                  <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-[#0B305B]" />
+                      Correo Electrónico de Contacto
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">contacto_correo</span>
+                  </label>
+                  <input
+                    type="email"
+                    name="contacto_correo"
+                    value={contactoCorreoInput}
+                    onChange={(e) => setContactoCorreoInput(e.target.value)}
+                    required
+                    placeholder="ingenierias@unisinu.edu.co"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-bold text-slate-800 outline-none transition"
+                  />
+                </div>
+
+                {/* 2. Teléfono / Conmutador */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5 text-emerald-700" />
+                      Conmutador / Teléfono Institucional
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">contacto_telefono</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="contacto_telefono"
+                    value={contactoTelefonoInput}
+                    onChange={(e) => setContactoTelefonoInput(e.target.value)}
+                    required
+                    placeholder="(+57) 604 784 0340 • Ext. 140 / 142"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-bold text-slate-800 outline-none transition"
+                  />
+                </div>
+
+                {/* 3. Ubicación Física */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-[#D2202E]" />
+                      Ubicación de la Decanatura / Sede
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">contacto_ubicacion</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="contacto_ubicacion"
+                    value={contactoUbicacionInput}
+                    onChange={(e) => setContactoUbicacionInput(e.target.value)}
+                    required
+                    placeholder="Campus Santillana, Bloque 3 • Montería, Córdoba"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-bold text-slate-800 outline-none transition"
+                  />
+                </div>
+
+                {/* 4. Horario de Atención */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-amber-700" />
+                      Horario de Atención al Público
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">contacto_horario</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="contacto_horario"
+                    value={contactoHorarioInput}
+                    onChange={(e) => setContactoHorarioInput(e.target.value)}
+                    required
+                    placeholder="Lunes a Viernes: 8:00 AM – 12:00 M / 2:00 PM – 6:00 PM"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-bold text-slate-800 outline-none transition"
+                  />
+                </div>
+              </div>
+
+              {/* Previsualización en Vivo del Modal de Contacto */}
+              <div className="pt-2 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-[#0B305B]" />
+                    Previsualización en Vivo de Canales (Modal de Contacto):
+                  </span>
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                    Sincronizado
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200/90 text-xs">
+                  {/* Item 1: Correo */}
+                  <div className="p-3 bg-white rounded-xl border border-slate-200 flex items-center gap-2.5 shadow-2xs">
+                    <div className="p-2 bg-indigo-50 text-[#0B305B] rounded-lg shrink-0">
+                      <Mail className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase block">Correo</span>
+                      <span className="font-bold text-[#0B305B] truncate block text-[11px]">
+                        {contactoCorreoInput || 'ingenierias@unisinu.edu.co'}
                       </span>
                     </div>
+                  </div>
 
-                    {/* Franja Color Secundario */}
-                    <div
-                      className="py-1 px-2 text-white font-bold text-[8px] transition-colors truncate"
-                      style={{ backgroundColor: colorSecundario }}
-                    >
-                      CONGRESO INTERNACIONAL DE IA
+                  {/* Item 2: Teléfono */}
+                  <div className="p-3 bg-white rounded-xl border border-slate-200 flex items-center gap-2.5 shadow-2xs">
+                    <div className="p-2 bg-emerald-50 text-emerald-700 rounded-lg shrink-0">
+                      <Phone className="w-3.5 h-3.5" />
                     </div>
-
-                    {/* Imagen central */}
-                    <div className="p-2 bg-slate-50">
-                      <div className="h-10 bg-slate-200 rounded flex items-center justify-center text-slate-400 text-[8px]">
-                        Imagen Central Temática
-                      </div>
-                    </div>
-
-                    {/* Tarjeta Estudiante */}
-                    <div className="p-2 border-t border-slate-100 space-y-0.5">
-                      <span className="text-[7px] font-extrabold block" style={{ color: colorPrimario }}>
-                        ESTUDIANTE / PARTICIPANTE
+                    <div className="min-w-0">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase block">Conmutador</span>
+                      <span className="font-bold text-slate-800 truncate block text-[11px]">
+                        {contactoTelefonoInput || '(+57) 604 784 0340 • Ext. 140 / 142'}
                       </span>
-                      <p className="font-bold text-slate-900 text-[9px]">MATEO MORALES SILVA</p>
-                      <p className="font-bold text-[8px]" style={{ color: colorSecundario }}>
-                        CÉDULA: 1047892341
-                      </p>
-                      <div className="pt-1 flex justify-center">
-                        <div className="h-4 w-28 bg-slate-800 rounded-xs flex items-center justify-center text-white text-[6px] font-mono">
-                          |||||||||||||||||||||||||
-                        </div>
-                      </div>
+                    </div>
+                  </div>
+
+                  {/* Item 3: Ubicación */}
+                  <div className="p-3 bg-white rounded-xl border border-slate-200 flex items-center gap-2.5 shadow-2xs">
+                    <div className="p-2 bg-rose-50 text-[#D2202E] rounded-lg shrink-0">
+                      <MapPin className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase block">Ubicación</span>
+                      <span className="font-bold text-slate-800 truncate block text-[11px]">
+                        {contactoUbicacionInput || 'Campus Santillana, Bloque 3 • Montería, Córdoba'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Item 4: Horario */}
+                  <div className="p-3 bg-white rounded-xl border border-slate-200 flex items-center gap-2.5 shadow-2xs">
+                    <div className="p-2 bg-amber-50 text-amber-700 rounded-lg shrink-0">
+                      <Clock className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase block">Horario</span>
+                      <span className="font-bold text-slate-800 truncate block text-[11px]">
+                        {contactoHorarioInput || 'Lunes a Viernes: 8:00 AM – 12:00 M / 2:00 PM – 6:00 PM'}
+                      </span>
                     </div>
                   </div>
                 </div>
+              </div>
 
-                {/* Mockup 2: Certificado Horizontal */}
-                <div className="space-y-1.5 pt-3 border-t border-slate-100">
-                  <span className="text-[11px] font-bold text-slate-700">2. Certificado de Asistencia (A4 Paisaje):</span>
-                  <div
-                    className="p-3 bg-amber-50/20 rounded-xl border-2 transition-all text-center space-y-1.5"
-                    style={{ borderColor: colorPrimario }}
-                  >
-                    <div
-                      className="p-2 border border-dashed rounded-lg"
-                      style={{ borderColor: colorSecundario }}
-                    >
-                      <span className="font-bold text-[8px] block" style={{ color: colorSecundario }}>
-                        UNIVERSIDAD DEL SINÚ
-                      </span>
-                      <span className="font-extrabold text-[10px] block" style={{ color: colorPrimario }}>
-                        CERTIFICADO DE ASISTENCIA
-                      </span>
-                      <p className="text-[7px] text-slate-500 pt-0.5">
-                        Certifica la asistencia de <strong>ALUMNO PARTICIPANTE</strong>
-                      </p>
-                      
-                      {/* Firma del Decano */}
-                      <div className="pt-2 flex justify-center gap-6 text-[7px]">
-                        <div className="text-center">
-                          <div className="w-20 border-b border-slate-400 mx-auto mb-0.5"></div>
-                          <span className="font-bold block text-slate-800">{nombreDecanoInput}</span>
-                          <span className="text-[6px] text-slate-500">{cargoFirmanteInput}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Mockup 3: Banner del Portal Público */}
-                <div className="space-y-1.5 pt-3 border-t border-slate-100">
-                  <span className="text-[11px] font-bold text-slate-700">3. Banner del Portal Público (Inicio /):</span>
-                  <div className="p-3 bg-gradient-to-r from-[#0B305B] to-[#041224] text-white rounded-xl border border-slate-300 text-left space-y-1.5">
-                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/10 text-[8px] font-bold text-white">
-                      <Sparkles className="w-2.5 h-2.5 text-[#D2202E]" />
-                      <span className="line-clamp-1">{tituloConvocatoriaInput || 'Convocatoria Académica Abierta'}</span>
-                    </div>
-                    <div className="text-[10px] font-black leading-tight line-clamp-1">
-                      {tituloConvocatoriaInput || 'Convocatoria Académica Abierta'}
-                    </div>
-                    <p className="text-[8px] text-slate-300 line-clamp-2 leading-relaxed">
-                      {descripcionConvocatoriaInput || 'Explora la oferta académica de la Universidad del Sinú...'}
-                    </p>
-                  </div>
-                </div>
+              {/* Barra Inferior de Guardado de la Tarjeta */}
+              <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100">
+                <span className="text-[11px] text-slate-500">
+                  Se actualiza directamente en <code className="font-mono text-[#0B305B] font-bold">ConfiguracionPlantillas</code>
+                </span>
+                <button
+                  type="submit"
+                  disabled={cargandoAccion}
+                  className="w-full sm:w-auto px-5 py-2.5 bg-[#0B305B] hover:bg-[#071F3B] text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {cargandoAccion ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-3.5 h-3.5 text-[#D2202E]" />
+                      Guardar Datos de Contacto
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
