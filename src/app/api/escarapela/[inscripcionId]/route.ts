@@ -46,6 +46,14 @@ export async function GET(
       colorSecundarioHex: configPlantillas.color_secundario,
       qrPayload: inscripcion.usuario.codigoEstudiantil || inscripcion.usuario.cedula || inscripcion.id,
       inscripcionId: inscripcion.id,
+      // Estilos dinámicos del evento
+      tamanoNombre: ev?.tamano_nombre_escarapela,
+      colorNombre: ev?.color_nombre_escarapela,
+      tamanoCarrera: ev?.tamano_carrera_escarapela,
+      colorCarrera: ev?.color_carrera_escarapela,
+      colorFondoRol: ev?.color_fondo_rol_escarapela,
+      colorTextoRol: ev?.color_texto_rol_escarapela,
+      estiloRol: ev?.estilo_etiqueta_rol,
     })
 
     return new NextResponse(Buffer.from(pdfBytes), {

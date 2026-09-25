@@ -98,6 +98,7 @@ model Evento {
   descripcion     String
   fechaInicio     DateTime
   fechaFin        DateTime
+  fecha_limite_inscripcion DateTime? // Fecha y hora límite para preinscripciones públicas (opcional)
   ubicacion       String       // Ej. "Auditorio Principal", "Laboratorio 3"
   capacidadMaxima Int?
   precio          Float        @default(0.0) // 0.0 para eventos gratuitos
@@ -112,12 +113,31 @@ model Evento {
   // Soporte de Certificación Oficial en PDF
   certificado_plantilla_url String?  // URL de la plantilla base en alta resolución (PNG/JPG)
   horas_academicas          Int?     @default(4) // Intensidad horaria certificada (ej. 4, 8, 20 horas)
+  mensaje_participacion     String?  @default("Por su asistencia, cumplimiento y destacada participación académica en el evento:")
+  intensidad_horaria        String?  @default("4 horas")
   nombre_firmante_1         String?  // Nombre del primer firmante (Decano o Docente Principal)
   cargo_firmante_1          String?  // Cargo del primer firmante
   firma_organizador_url     String?  // Firma escaneada del primer firmante
   firma_director_url        String?  // Firma escaneada del segundo firmante
   nombre_firmante_2         String?  // Nombre del segundo firmante
   cargo_firmante_2          String?  // Cargo del segundo firmante
+
+  // Estilos Visuales y Tipografía del Certificado (PDF)
+  fuente_certificado       String?  @default("Montserrat")
+  color_nombre_alumno      String?  @default("#0B305B")
+  color_texto_principal    String?  @default("#1E293B")
+  tamano_nombre_alumno     Int?     @default(24)
+  tamano_participacion     Int?     @default(12)
+  color_firmantes          String?  @default("#0F172A")
+
+  // Estilos Visuales de la Escarapela (Carnet Vertical PDF)
+  tamano_nombre_escarapela     Int?     @default(13)
+  color_nombre_escarapela      String?  @default("#0B305B")
+  tamano_carrera_escarapela    Int?     @default(7)
+  color_carrera_escarapela     String?  @default("#526176")
+  color_fondo_rol_escarapela   String?  @default("#D2202E")
+  color_texto_rol_escarapela   String?  @default("#FFFFFF")
+  estilo_etiqueta_rol          String?  @default("SOLIDO") // 'SOLIDO' | 'CONTORNO_CURVO' | 'TEXTO_LIBRE'
 
   programa_academico   String?      @default("Facultad de Ingenierías") // Programa académico (Multi-Tenancy)
   programaId           String?

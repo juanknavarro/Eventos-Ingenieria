@@ -6,6 +6,8 @@ export interface DatosGeneracionCertificado {
   alumnoCarrera?: string | null
   eventoTitulo: string
   horasAcademicas?: number | null
+  intensidadHoraria?: string | null
+  mensajeParticipacion?: string | null
   fechaEvento?: Date | string | null
   fondoUrl?: string | null
   firmaDecanoUrl?: string | null
@@ -18,6 +20,26 @@ export interface DatosGeneracionCertificado {
   nombreFirmante2?: string | null
   cargoFirmante2?: string | null
   asistenciaId?: string | null
+  // Nuevos estilos visuales y tipografía
+  fuenteCertificado?: string | null
+  colorNombreAlumno?: string | null
+  colorTextoPrincipal?: string | null
+  tamanoNombreAlumno?: number | null
+  tamanoParticipacion?: number | null
+  colorFirmantes?: string | null
+}
+
+/**
+ * Convierte un código hexadecimal (#RRGGBB o RRGGBB) a formato rgb() normalizado (0.0 a 1.0) de pdf-lib
+ */
+export function parsearHexARgb(hex?: string | null, fallback = rgb(0.043, 0.188, 0.357)) {
+  if (!hex || typeof hex !== 'string') return fallback
+  const clean = hex.trim().replace(/^#/, '')
+  if (!/^[0-9A-Fa-f]{6}$/.test(clean)) return fallback
+  const r = parseInt(clean.substring(0, 2), 16) / 255
+  const g = parseInt(clean.substring(2, 4), 16) / 255
+  const b = parseInt(clean.substring(4, 6), 16) / 255
+  return rgb(r, g, b)
 }
 
 /**
@@ -108,18 +130,27 @@ export async function generarCertificadoPdf(
   const pdfDoc = await PDFDocument.create()
   const page = pdfDoc.addPage([width, height])
 
-  // Cargar fuentes tipográficas estándar integradas en PDF
-  const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
-  const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica)
-  const fontOblique = await pdfDoc.embedFont(StandardFonts.HelveticaOblique)
+  // Cargar fuentes tipográficas con regla de mapeo seguro:
+  // Si elige 'Times' o 'Playfair', StandardFonts.TimesRoman. De lo contrario, StandardFonts.Helvetica
+  const fuenteSolicitada = (datos.fuenteCertificado || '').toLowerCase()
+  const esSerif = fuenteSolicitada.includes('times') || fuenteSolicitada.includes('playfair')
+
+  const fontBold = await pdfDoc.embedFont(esSerif ? StandardFonts.TimesRomanBold : StandardFonts.HelveticaBold)
+  const fontRegular = await pdfDoc.embedFont(esSerif ? StandardFonts.TimesRoman : StandardFonts.Helvetica)
+  const fontOblique = await pdfDoc.embedFont(esSerif ? StandardFonts.TimesRomanItalic : StandardFonts.HelveticaOblique)
   const fontMono = await pdfDoc.embedFont(StandardFonts.Courier)
 
-  // Paleta institucional Unisinú
+  // Paleta institucional Unisinú (Valores base de respaldo)
   const colorAzulMarino = rgb(0.043, 0.188, 0.357) // #0B305B
   const colorRojo = rgb(0.824, 0.125, 0.180) // #D2202E
   const colorOscuro = rgb(0.06, 0.09, 0.16) // #0F172A
   const colorGris = rgb(0.32, 0.38, 0.46) // #526176
   const colorBorde = rgb(0.78, 0.82, 0.88)
+
+  // Colores dinámicos configurados por evento con fallback seguro
+  const colorNombreAlumnoRgb = parsearHexARgb(datos.colorNombreAlumno, colorAzulMarino)
+  const colorTextoPrincipalRgb = parsearHexARgb(datos.colorTextoPrincipal, colorOscuro)
+  const colorFirmantesRgb = parsearHexARgb(datos.colorFirmantes, colorOscuro)
 
   // 1. Cargar imagen de plantilla de fondo si está provista
   const imagenFondo = await cargarEIncrustarImagen(pdfDoc, datos.fondoUrl)
@@ -204,25 +235,30 @@ export async function generarCertificadoPdf(
     color: colorRojo,
   })
 
-  // 3. Nombre del Alumno (Centrado horizontal matemático en X)
+  // 3. Nombre del Alumno (Centrado horizontal matemático en X con tamaño y color dinámicos)
   const nombreLimpio = (datos.alumnoNombre || 'ESTUDIANTE UNISINÚ').toUpperCase().trim()
-  const sizeNombre = nombreLimpio.length > 32 ? 20 : 24
-  const wNombre = fontBold.widthOfTextAtSize(nombreLimpio, sizeNombre)
+  const tamanoBaseAlumno = Number(datos.tamanoNombreAlumno) > 0 ? Number(datos.tamanoNombreAlumno) : 24
+  let sizeNombre = nombreLimpio.length > 32 ? Math.min(tamanoBaseAlumno - 4, 20) : tamanoBaseAlumno
+  let wNombre = fontBold.widthOfTextAtSize(nombreLimpio, sizeNombre)
+  if (wNombre > width - 100) {
+    sizeNombre = Math.max(16, (sizeNombre * (width - 100)) / wNombre)
+    wNombre = fontBold.widthOfTextAtSize(nombreLimpio, sizeNombre)
+  }
   page.drawText(nombreLimpio, {
     x: (width - wNombre) / 2,
     y: 320,
     size: sizeNombre,
     font: fontBold,
-    color: colorAzulMarino,
+    color: colorNombreAlumnoRgb,
   })
 
-  // Línea sutil de realce bajo el nombre
+  // Línea sutil de realce bajo el nombre con color dinámico
   const anchoLineaNombre = Math.min(Math.max(wNombre + 50, 320), width - 120)
   page.drawLine({
     start: { x: (width - anchoLineaNombre) / 2, y: 312 },
     end: { x: (width + anchoLineaNombre) / 2, y: 312 },
     thickness: 1.5,
-    color: colorAzulMarino,
+    color: colorNombreAlumnoRgb,
   })
 
   // 4. Documento de Identidad y Carrera
@@ -238,16 +274,22 @@ export async function generarCertificadoPdf(
     color: colorGris,
   })
 
-  // 5. Declaración de participación
-  const txtParticipacion = 'Por su asistencia, cumplimiento y destacada participación académica en el evento:'
-  const sizePart = 11.5
-  const wPart = fontRegular.widthOfTextAtSize(txtParticipacion, sizePart)
+  // 5. Declaración de participación dinámico con tamaño y color configurables
+  const txtParticipacion = (datos.mensajeParticipacion && datos.mensajeParticipacion.trim())
+    ? datos.mensajeParticipacion.trim()
+    : 'Por su asistencia, cumplimiento y destacada participación académica en el evento:'
+  let sizePart = Number(datos.tamanoParticipacion) > 0 ? Number(datos.tamanoParticipacion) : 11.5
+  let wPart = fontRegular.widthOfTextAtSize(txtParticipacion, sizePart)
+  if (wPart > width - 120) {
+    sizePart = Math.max(9, (sizePart * (width - 120)) / wPart)
+    wPart = fontRegular.widthOfTextAtSize(txtParticipacion, sizePart)
+  }
   page.drawText(txtParticipacion, {
     x: (width - wPart) / 2,
     y: 258,
     size: sizePart,
     font: fontRegular,
-    color: colorOscuro,
+    color: colorTextoPrincipalRgb,
   })
 
   // 6. Nombre del Evento (Centrado horizontal)
@@ -259,22 +301,31 @@ export async function generarCertificadoPdf(
     y: 228,
     size: sizeEvento,
     font: fontBold,
-    color: colorAzulMarino,
+    color: colorNombreAlumnoRgb,
   })
 
-  // 7. Horas Académicas y Fecha de Emisión
+  // 7. Horas Académicas / Intensidad Horaria y Fecha de Emisión dinámicas con fallback
   const horas = datos.horasAcademicas && datos.horasAcademicas > 0 ? datos.horasAcademicas : 4
   const fechaFormateada = formatearFechaEspanol(datos.fechaEvento)
 
-  const txtHorasYFecha = `Con una intensidad académica debidamente certificada de ${horas} horas de formación continua.`
-  const sizeHoras = 10.5
-  const wHoras = fontRegular.widthOfTextAtSize(txtHorasYFecha, sizeHoras)
+  const txtHorasYFecha = (datos.intensidadHoraria && datos.intensidadHoraria.trim())
+    ? (datos.intensidadHoraria.trim().toLowerCase().startsWith('con ')
+        ? datos.intensidadHoraria.trim()
+        : `Con una intensidad académica debidamente certificada de ${datos.intensidadHoraria.trim()}.`)
+    : `Con una intensidad académica debidamente certificada de ${horas} horas de formación continua.`
+
+  let sizeHoras = 10.5
+  let wHoras = fontRegular.widthOfTextAtSize(txtHorasYFecha, sizeHoras)
+  if (wHoras > width - 120) {
+    sizeHoras = Math.max(8.5, (sizeHoras * (width - 120)) / wHoras)
+    wHoras = fontRegular.widthOfTextAtSize(txtHorasYFecha, sizeHoras)
+  }
   page.drawText(txtHorasYFecha, {
     x: (width - wHoras) / 2,
     y: 198,
     size: sizeHoras,
     font: fontRegular,
-    color: colorOscuro,
+    color: colorTextoPrincipalRgb,
   })
 
   const txtLugarFecha = `Expedido en la ciudad de Montería, Colombia, a los ${fechaFormateada}.`
@@ -351,7 +402,7 @@ export async function generarCertificadoPdf(
       y: yLineasFirmas - 15,
       size: sizeNombre,
       font: fontBold,
-      color: colorOscuro,
+      color: colorFirmantesRgb,
     })
 
     // D. Cargo del firmante centrado en su columna
@@ -366,7 +417,7 @@ export async function generarCertificadoPdf(
       y: yLineasFirmas - 27,
       size: sizeCargo,
       font: fontRegular,
-      color: colorGris,
+      color: colorFirmantesRgb,
     })
   }
 
@@ -397,7 +448,7 @@ export async function descargarCertificadoPdf(
   nombreArchivo?: string
 ): Promise<void> {
   const pdfBytes = await generarCertificadoPdf(datos)
-  const blob = new Blob([pdfBytes], { type: 'application/pdf' })
+  const blob = new Blob([pdfBytes as any], { type: 'application/pdf' })
   const url = URL.createObjectURL(blob)
 
   const link = document.createElement('a')

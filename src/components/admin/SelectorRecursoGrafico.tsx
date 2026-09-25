@@ -100,11 +100,11 @@ export default function SelectorRecursoGrafico({
         <div className="space-y-2">
           <div className="relative">
             <input
-              type="url"
+              type="text"
               name={nombreCampoUrl}
               value={urlIngresada}
               onChange={(e) => setUrlIngresada(e.target.value)}
-              placeholder="https://images.unsplash.com/... o https://midominio.com/foto.jpg"
+              placeholder="https://... o ruta relativa ej. /uploads/imagen.png"
               className="w-full pl-3 pr-8 py-2 bg-white border border-slate-200 focus:border-[#0B305B] rounded-xl text-xs outline-none transition"
             />
             {urlIngresada && (
@@ -118,8 +118,8 @@ export default function SelectorRecursoGrafico({
             )}
           </div>
 
-          {/* Previsualización de la URL externa */}
-          {urlIngresada && urlIngresada.startsWith('http') && (
+          {/* Previsualización de la URL externa o ruta relativa */}
+          {urlIngresada && (urlIngresada.startsWith('http') || urlIngresada.startsWith('/')) && (
             <div className="flex items-center gap-3 p-2 bg-white rounded-xl border border-slate-200">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -131,7 +131,7 @@ export default function SelectorRecursoGrafico({
                 }}
               />
               <div className="min-w-0 text-[10px] text-slate-500">
-                <span className="font-bold text-emerald-700 block">URL vinculada correctamente</span>
+                <span className="font-bold text-emerald-700 block">Ruta / URL vinculada correctamente</span>
                 <span className="truncate block font-mono">{urlIngresada}</span>
               </div>
             </div>

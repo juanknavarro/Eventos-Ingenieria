@@ -120,6 +120,8 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
     const descripcion = formData.get('descripcion') as string
     const fechaInicioStr = formData.get('fechaInicio') as string
     const fechaFinStr = formData.get('fechaFin') as string
+    const fechaLimiteStr = (formData.get('fecha_limite_inscripcion') as string)?.trim()
+    const fecha_limite_inscripcion = fechaLimiteStr ? new Date(fechaLimiteStr) : null
     const ubicacion = formData.get('ubicacion') as string
     const capacidadMaximaStr = formData.get('capacidadMaxima') as string
     const precioStr = formData.get('precio') as string
@@ -140,6 +142,28 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
     let firmaDirectorUrl = (formData.get('firma_director_url') as string)?.trim() || null
     const nombreFirmante2 = (formData.get('nombre_firmante_2') as string)?.trim() || null
     const cargoFirmante2 = (formData.get('cargo_firmante_2') as string)?.trim() || null
+    const mensajeParticipacion = (formData.get('mensaje_participacion') as string)?.trim() || null
+    const intensidadHoraria = (formData.get('intensidad_horaria') as string)?.trim() || null
+
+    const fuenteCertificado = (formData.get('fuente_certificado') as string)?.trim() || 'Montserrat'
+    const colorNombreAlumno = (formData.get('color_nombre_alumno') as string)?.trim() || '#0B305B'
+    const colorTextoPrincipal = (formData.get('color_texto_principal') as string)?.trim() || '#1E293B'
+    const tamanoNombreAlumnoStr = formData.get('tamano_nombre_alumno') as string
+    const tamanoNombreAlumno = tamanoNombreAlumnoStr ? parseInt(tamanoNombreAlumnoStr, 10) : 24
+    const tamanoParticipacionStr = formData.get('tamano_participacion') as string
+    const tamanoParticipacion = tamanoParticipacionStr ? parseInt(tamanoParticipacionStr, 10) : 12
+    const colorFirmantes = (formData.get('color_firmantes') as string)?.trim() || '#0F172A'
+
+    // Estilos dinámicos para la escarapela (carnet)
+    const tamanoNombreEscStr = formData.get('tamano_nombre_escarapela') as string
+    const tamanoNombreEscarapela = tamanoNombreEscStr ? parseInt(tamanoNombreEscStr, 10) : 13
+    const colorNombreEscarapela = (formData.get('color_nombre_escarapela') as string)?.trim() || '#0B305B'
+    const tamanoCarreraEscStr = formData.get('tamano_carrera_escarapela') as string
+    const tamanoCarreraEscarapela = tamanoCarreraEscStr ? parseInt(tamanoCarreraEscStr, 10) : 7
+    const colorCarreraEscarapela = (formData.get('color_carrera_escarapela') as string)?.trim() || '#526176'
+    const colorFondoRolEscarapela = (formData.get('color_fondo_rol_escarapela') as string)?.trim() || '#D2202E'
+    const colorTextoRolEscarapela = (formData.get('color_texto_rol_escarapela') as string)?.trim() || '#FFFFFF'
+    const estiloEtiquetaRol = (formData.get('estilo_etiqueta_rol') as string)?.trim() || 'SOLIDO'
 
     if (!titulo || !descripcion || !fechaInicioStr || !ubicacion) {
       return { success: false, error: 'Por favor completa todos los campos requeridos.' }
@@ -220,6 +244,7 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
         descripcion,
         fechaInicio: new Date(fechaInicioStr),
         fechaFin: fechaFinStr ? new Date(fechaFinStr) : new Date(fechaInicioStr),
+        fecha_limite_inscripcion,
         ubicacion,
         capacidadMaxima: capacidadMaximaStr ? parseInt(capacidadMaximaStr, 10) : null,
         precio: precioStr ? parseFloat(precioStr) : 0.0,
@@ -232,6 +257,21 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
         certificado_plantilla_url: certificadoPlantillaUrl,
         escarapela_plantilla_url: escarapelaPlantillaUrl,
         horas_academicas: horasAcademicas,
+        mensaje_participacion: mensajeParticipacion,
+        intensidad_horaria: intensidadHoraria,
+        fuente_certificado: fuenteCertificado,
+        color_nombre_alumno: colorNombreAlumno,
+        color_texto_principal: colorTextoPrincipal,
+        tamano_nombre_alumno: tamanoNombreAlumno,
+        tamano_participacion: tamanoParticipacion,
+        color_firmantes: colorFirmantes,
+        tamano_nombre_escarapela: tamanoNombreEscarapela,
+        color_nombre_escarapela: colorNombreEscarapela,
+        tamano_carrera_escarapela: tamanoCarreraEscarapela,
+        color_carrera_escarapela: colorCarreraEscarapela,
+        color_fondo_rol_escarapela: colorFondoRolEscarapela,
+        color_texto_rol_escarapela: colorTextoRolEscarapela,
+        estilo_etiqueta_rol: estiloEtiquetaRol,
         nombre_firmante_1: nombreFirmante1,
         cargo_firmante_1: cargoFirmante1,
         firma_organizador_url: firmaOrganizadorUrl,
@@ -269,6 +309,8 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
     const descripcion = formData.get('descripcion') as string
     const fechaInicioStr = formData.get('fechaInicio') as string
     const fechaFinStr = formData.get('fechaFin') as string
+    const fechaLimiteStr = (formData.get('fecha_limite_inscripcion') as string)?.trim()
+    const fecha_limite_inscripcion = fechaLimiteStr ? new Date(fechaLimiteStr) : null
     const ubicacion = formData.get('ubicacion') as string
     const capacidadMaximaStr = formData.get('capacidadMaxima') as string
     const precioStr = formData.get('precio') as string
@@ -289,6 +331,28 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
     let firmaDirectorUrl = (formData.get('firma_director_url') as string)?.trim() || null
     const nombreFirmante2 = (formData.get('nombre_firmante_2') as string)?.trim() || null
     const cargoFirmante2 = (formData.get('cargo_firmante_2') as string)?.trim() || null
+    const mensajeParticipacion = (formData.get('mensaje_participacion') as string)?.trim() || null
+    const intensidadHoraria = (formData.get('intensidad_horaria') as string)?.trim() || null
+
+    const fuenteCertificado = (formData.get('fuente_certificado') as string)?.trim() || 'Montserrat'
+    const colorNombreAlumno = (formData.get('color_nombre_alumno') as string)?.trim() || '#0B305B'
+    const colorTextoPrincipal = (formData.get('color_texto_principal') as string)?.trim() || '#1E293B'
+    const tamanoNombreAlumnoStr = formData.get('tamano_nombre_alumno') as string
+    const tamanoNombreAlumno = tamanoNombreAlumnoStr ? parseInt(tamanoNombreAlumnoStr, 10) : 24
+    const tamanoParticipacionStr = formData.get('tamano_participacion') as string
+    const tamanoParticipacion = tamanoParticipacionStr ? parseInt(tamanoParticipacionStr, 10) : 12
+    const colorFirmantes = (formData.get('color_firmantes') as string)?.trim() || '#0F172A'
+
+    // Estilos dinámicos para la escarapela (carnet)
+    const tamanoNombreEscStr = formData.get('tamano_nombre_escarapela') as string
+    const tamanoNombreEscarapela = tamanoNombreEscStr ? parseInt(tamanoNombreEscStr, 10) : 13
+    const colorNombreEscarapela = (formData.get('color_nombre_escarapela') as string)?.trim() || '#0B305B'
+    const tamanoCarreraEscStr = formData.get('tamano_carrera_escarapela') as string
+    const tamanoCarreraEscarapela = tamanoCarreraEscStr ? parseInt(tamanoCarreraEscStr, 10) : 7
+    const colorCarreraEscarapela = (formData.get('color_carrera_escarapela') as string)?.trim() || '#526176'
+    const colorFondoRolEscarapela = (formData.get('color_fondo_rol_escarapela') as string)?.trim() || '#D2202E'
+    const colorTextoRolEscarapela = (formData.get('color_texto_rol_escarapela') as string)?.trim() || '#FFFFFF'
+    const estiloEtiquetaRol = (formData.get('estilo_etiqueta_rol') as string)?.trim() || 'SOLIDO'
 
     if (!eventoId || !titulo || !descripcion) {
       return { success: false, error: 'Identificador o campos obligatorios faltantes.' }
@@ -382,6 +446,7 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
         descripcion,
         fechaInicio: fechaInicioStr ? new Date(fechaInicioStr) : undefined,
         fechaFin: fechaFinStr ? new Date(fechaFinStr) : undefined,
+        fecha_limite_inscripcion,
         ubicacion,
         capacidadMaxima: capacidadMaximaStr ? parseInt(capacidadMaximaStr, 10) : null,
         precio: precioStr ? parseFloat(precioStr) : 0.0,
@@ -393,6 +458,21 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
         certificado_plantilla_url: certificadoPlantillaUrl,
         escarapela_plantilla_url: escarapelaPlantillaUrl,
         horas_academicas: horasAcademicas,
+        mensaje_participacion: mensajeParticipacion,
+        intensidad_horaria: intensidadHoraria,
+        fuente_certificado: fuenteCertificado,
+        color_nombre_alumno: colorNombreAlumno,
+        color_texto_principal: colorTextoPrincipal,
+        tamano_nombre_alumno: tamanoNombreAlumno,
+        tamano_participacion: tamanoParticipacion,
+        color_firmantes: colorFirmantes,
+        tamano_nombre_escarapela: tamanoNombreEscarapela,
+        color_nombre_escarapela: colorNombreEscarapela,
+        tamano_carrera_escarapela: tamanoCarreraEscarapela,
+        color_carrera_escarapela: colorCarreraEscarapela,
+        color_fondo_rol_escarapela: colorFondoRolEscarapela,
+        color_texto_rol_escarapela: colorTextoRolEscarapela,
+        estilo_etiqueta_rol: estiloEtiquetaRol,
         nombre_firmante_1: nombreFirmante1,
         cargo_firmante_1: cargoFirmante1,
         firma_organizador_url: firmaOrganizadorUrl,

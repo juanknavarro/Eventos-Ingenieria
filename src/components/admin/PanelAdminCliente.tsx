@@ -46,6 +46,8 @@ import {
   eliminarUsuario,
 } from '@/actions/admin'
 import SelectorRecursoGrafico from './SelectorRecursoGrafico'
+import IconSelector from './IconSelector'
+import { resolverIconoLucide } from '@/lib/icons/catalogoIconos'
 import { ConfiguracionPlantillasData } from '@/lib/config/plantillas'
 
 interface EventoData {
@@ -159,12 +161,25 @@ export default function PanelAdminCliente({
   const [caracteristica1Input, setCaracteristica1Input] = useState(
     configPlantillas?.caracteristica_1 || 'Carnetización Oficial'
   )
+  const [icono1Input, setIcono1Input] = useState(
+    configPlantillas?.icono_1 || 'CheckCircle2'
+  )
   const [caracteristica2Input, setCaracteristica2Input] = useState(
     configPlantillas?.caracteristica_2 || 'Formación Continua'
+  )
+  const [icono2Input, setIcono2Input] = useState(
+    configPlantillas?.icono_2 || 'BookOpen'
   )
   const [caracteristica3Input, setCaracteristica3Input] = useState(
     configPlantillas?.caracteristica_3 || 'Certificado Digital con QR'
   )
+  const [icono3Input, setIcono3Input] = useState(
+    configPlantillas?.icono_3 || 'Award'
+  )
+
+  const PreviewIcono1 = resolverIconoLucide(icono1Input, CheckCircle2)
+  const PreviewIcono2 = resolverIconoLucide(icono2Input, BookOpen)
+  const PreviewIcono3 = resolverIconoLucide(icono3Input, Award)
   const [contactoCorreoInput, setContactoCorreoInput] = useState(
     configPlantillas?.contacto_correo || 'ingenierias@unisinu.edu.co'
   )
@@ -1055,52 +1070,73 @@ export default function PanelAdminCliente({
                   {/* Característica 1 */}
                   <div className="space-y-1">
                     <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <PreviewIcono1 className="w-3.5 h-3.5 text-emerald-600" />
                       Píldora 1
                     </label>
-                    <input
-                      type="text"
-                      name="caracteristica_1"
-                      value={caracteristica1Input}
-                      onChange={(e) => setCaracteristica1Input(e.target.value)}
-                      required
-                      placeholder="Carnetización Oficial"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-semibold text-slate-800 outline-none transition"
-                    />
+                    <div className="flex items-center gap-2">
+                      <IconSelector
+                        valorActual={icono1Input}
+                        alSeleccionar={setIcono1Input}
+                        nombreCampoHidden="icono_1"
+                      />
+                      <input
+                        type="text"
+                        name="caracteristica_1"
+                        value={caracteristica1Input}
+                        onChange={(e) => setCaracteristica1Input(e.target.value)}
+                        required
+                        placeholder="Carnetización Oficial"
+                        className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-semibold text-slate-800 outline-none transition"
+                      />
+                    </div>
                   </div>
 
                   {/* Característica 2 */}
                   <div className="space-y-1">
                     <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
-                      <BookOpen className="w-3.5 h-3.5 text-[#D2202E]" />
+                      <PreviewIcono2 className="w-3.5 h-3.5 text-[#D2202E]" />
                       Píldora 2
                     </label>
-                    <input
-                      type="text"
-                      name="caracteristica_2"
-                      value={caracteristica2Input}
-                      onChange={(e) => setCaracteristica2Input(e.target.value)}
-                      required
-                      placeholder="Formación Continua"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-semibold text-slate-800 outline-none transition"
-                    />
+                    <div className="flex items-center gap-2">
+                      <IconSelector
+                        valorActual={icono2Input}
+                        alSeleccionar={setIcono2Input}
+                        nombreCampoHidden="icono_2"
+                      />
+                      <input
+                        type="text"
+                        name="caracteristica_2"
+                        value={caracteristica2Input}
+                        onChange={(e) => setCaracteristica2Input(e.target.value)}
+                        required
+                        placeholder="Formación Continua"
+                        className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-semibold text-slate-800 outline-none transition"
+                      />
+                    </div>
                   </div>
 
                   {/* Característica 3 */}
                   <div className="space-y-1">
                     <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
-                      <Award className="w-3.5 h-3.5 text-amber-600" />
+                      <PreviewIcono3 className="w-3.5 h-3.5 text-amber-600" />
                       Píldora 3
                     </label>
-                    <input
-                      type="text"
-                      name="caracteristica_3"
-                      value={caracteristica3Input}
-                      onChange={(e) => setCaracteristica3Input(e.target.value)}
-                      required
-                      placeholder="Certificado Digital con QR"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-semibold text-slate-800 outline-none transition"
-                    />
+                    <div className="flex items-center gap-2">
+                      <IconSelector
+                        valorActual={icono3Input}
+                        alSeleccionar={setIcono3Input}
+                        nombreCampoHidden="icono_3"
+                      />
+                      <input
+                        type="text"
+                        name="caracteristica_3"
+                        value={caracteristica3Input}
+                        onChange={(e) => setCaracteristica3Input(e.target.value)}
+                        required
+                        placeholder="Certificado Digital con QR"
+                        className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-semibold text-slate-800 outline-none transition"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1132,15 +1168,15 @@ export default function PanelAdminCliente({
                   {/* Píldoras en vivo en la previsualización */}
                   <div className="pt-1.5 flex items-center gap-2 flex-wrap">
                     <div className="flex items-center gap-1.5 text-[9px] text-slate-200 font-bold bg-white/10 px-2.5 py-1 rounded-lg border border-white/15">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                      <PreviewIcono1 className="w-3 h-3 text-emerald-400 shrink-0" />
                       <span className="truncate max-w-[130px]">{caracteristica1Input || 'Carnetización Oficial'}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-[9px] text-slate-200 font-bold bg-white/10 px-2.5 py-1 rounded-lg border border-white/15">
-                      <BookOpen className="w-3 h-3 text-[#F6CDD1] shrink-0" />
+                      <PreviewIcono2 className="w-3 h-3 text-[#F6CDD1] shrink-0" />
                       <span className="truncate max-w-[130px]">{caracteristica2Input || 'Formación Continua'}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-[9px] text-slate-200 font-bold bg-white/10 px-2.5 py-1 rounded-lg border border-white/15">
-                      <Award className="w-3 h-3 text-amber-300 shrink-0" />
+                      <PreviewIcono3 className="w-3 h-3 text-amber-300 shrink-0" />
                       <span className="truncate max-w-[130px]">{caracteristica3Input || 'Certificado Digital con QR'}</span>
                     </div>
                   </div>

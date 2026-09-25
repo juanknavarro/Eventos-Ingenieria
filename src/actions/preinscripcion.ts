@@ -119,13 +119,16 @@ export async function preinscribirAlumno(formData: FormData): Promise<Preinscrip
       }
     }
 
-    // Candado de vigencia temporal: si la fecha ya expiró, bloquea la inscripción
+    // Candado de vigencia temporal: valida contra fecha_limite_inscripcion (fallback a fechaInicio si es nula)
     const ahora = new Date()
-    const fechaLimite = new Date(evento.fechaFin || evento.fechaInicio)
+    const fechaLimite = (evento as any).fecha_limite_inscripcion
+      ? new Date((evento as any).fecha_limite_inscripcion)
+      : new Date(evento.fechaInicio)
+
     if (fechaLimite < ahora) {
       return {
         success: false,
-        error: 'Las inscripciones para este evento han finalizado (evento no vigente).',
+        error: 'El período de preinscripción para este evento ha finalizado (plazo límite vencido).',
       }
     }
 

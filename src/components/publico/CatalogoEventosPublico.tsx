@@ -34,6 +34,7 @@ export interface EventoPublico {
   descripcion: string
   fechaInicio: Date | string
   fechaFin: Date | string
+  fecha_limite_inscripcion?: Date | string | null
   ubicacion: string
   capacidadMaxima: number | null
   precio: number
@@ -308,10 +309,13 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
               ? Math.max(0, evento.capacidadMaxima - evento._count.inscripciones)
               : null
 
-            // Control de Vigencia y Aforo
+            // Control de Vigencia y Aforo con Fecha Límite Desacoplada
             const ahora = new Date()
-            const fechaLimite = new Date(evento.fechaFin || evento.fechaInicio)
-            const esExpirado = fechaLimite < ahora
+            const fechaCierreInscripcion = evento.fecha_limite_inscripcion
+              ? new Date(evento.fecha_limite_inscripcion)
+              : new Date(evento.fechaInicio)
+
+            const esExpirado = fechaCierreInscripcion < ahora
             const esAgotado =
               evento.capacidadMaxima !== null && evento._count.inscripciones >= evento.capacidadMaxima
 
@@ -370,6 +374,27 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
                       <Clock className="w-4 h-4 shrink-0" />
                       <span className="capitalize">{fechaFormat} &bull; {horaFormat}</span>
                     </div>
+
+                    {/* Etiqueta Visual de Fecha Límite de Inscripción */}
+                    {evento.fecha_limite_inscripcion && (
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-[11px] font-medium">
+                        <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                        <span>
+                          Límite de inscripción:{' '}
+                          <strong className="font-bold">
+                            {new Date(evento.fecha_limite_inscripcion).toLocaleDateString('es-CO', {
+                              day: 'numeric',
+                              month: 'short',
+                            })}{' '}
+                            &bull;{' '}
+                            {new Date(evento.fecha_limite_inscripcion).toLocaleTimeString('es-CO', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </strong>
+                        </span>
+                      </div>
+                    )}
 
                     {/* Título del Evento */}
                     <h3 className="text-base font-extrabold text-[#0B305B] group-hover:text-[#D2202E] transition-colors leading-snug line-clamp-2">
@@ -543,6 +568,14 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
                       {eventoSeleccionado.precio === 0
                         ? 'Evento Gratuito'
                         : `Valor: $${eventoSeleccionado.precio.toLocaleString('es-CO')} COP`}
+                      {eventoSeleccionado.fecha_limite_inscripcion && (
+                        <>
+                          {' '}&bull;{' '}
+                          <span className="text-amber-800 font-medium">
+                            Cierre: {new Date(eventoSeleccionado.fecha_limite_inscripcion).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })} {new Date(eventoSeleccionado.fecha_limite_inscripcion).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </>
+                      )}
                     </p>
                   </div>
                   <div className="p-2 bg-white rounded-xl border border-slate-200 text-slate-700 shrink-0 font-bold text-xs">

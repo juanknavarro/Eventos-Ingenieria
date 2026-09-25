@@ -17,6 +17,54 @@ export interface DatosEscarapela {
   colorSecundarioHex?: string | null
   qrPayload?: string | null // Información codificada en el QR
   inscripcionId?: string | null
+
+  // Estilos dinámicos y tipografía personalizada (compatibilidad camelCase y snake_case)
+  tamanoNombre?: number | null
+  tamano_nombre_escarapela?: number | null
+  colorNombre?: string | null
+  color_nombre_escarapela?: string | null
+  tamanoCarrera?: number | null
+  tamano_carrera_escarapela?: number | null
+  colorCarrera?: string | null
+  color_carrera_escarapela?: string | null
+  colorFondoRol?: string | null
+  color_fondo_rol_escarapela?: string | null
+  colorTextoRol?: string | null
+  color_texto_rol_escarapela?: string | null
+  estiloRol?: string | null // 'SOLIDO' | 'CONTORNO_CURVO' | 'TEXTO_LIBRE'
+  estilo_etiqueta_rol?: string | null
+}
+
+export type DatosGeneracionEscarapela = DatosEscarapela
+
+/**
+ * Genera la cadena de comandos SVG para un rectángulo con esquinas redondeadas continuas.
+ * Parametrizado localmente desde (0,0) hacia (w, h).
+ */
+export function generarPathRectanguloRedondeado(w: number, h: number, r: number): string {
+  const radio = Math.min(r, h / 2, w / 2)
+  return `M ${radio} 0 ` +
+         `L ${w - radio} 0 ` +
+         `Q ${w} 0 ${w} ${radio} ` +
+         `L ${w} ${h - radio} ` +
+         `Q ${w} ${h} ${w - radio} ${h} ` +
+         `L ${radio} ${h} ` +
+         `Q 0 ${h} 0 ${h - radio} ` +
+         `L 0 ${radio} ` +
+         `Q 0 0 ${radio} 0 Z`
+}
+
+/**
+ * Convierte un código hexadecimal (#RRGGBB o RRGGBB) a formato rgb() normalizado (0.0 a 1.0) de pdf-lib
+ */
+export function parsearHexARgb(hex?: string | null, fallback = rgb(0.043, 0.188, 0.357)) {
+  if (!hex || typeof hex !== 'string') return fallback
+  const clean = hex.trim().replace(/^#/, '')
+  if (!/^[0-9A-Fa-f]{6}$/.test(clean)) return fallback
+  const r = parseInt(clean.substring(0, 2), 16) / 255
+  const g = parseInt(clean.substring(2, 4), 16) / 255
+  const b = parseInt(clean.substring(4, 6), 16) / 255
+  return rgb(r, g, b)
 }
 
 /**
@@ -124,12 +172,23 @@ export async function generarPdfEscarapela(datos: DatosEscarapela): Promise<Uint
   const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica)
   const fontMono = await pdfDoc.embedFont(StandardFonts.CourierBold)
 
-  // Paleta institucional Universidad del Sinú
+  // Paleta institucional Universidad del Sinú (defaults)
   const colorAzulMarino = rgb(0.043, 0.188, 0.357) // #0B305B
   const colorRojo = rgb(0.824, 0.125, 0.180)       // #D2202E
   const colorOscuro = rgb(0.06, 0.09, 0.16)         // #0F172A
   const colorGris = rgb(0.35, 0.40, 0.48)           // #5A667A
   const colorBorde = rgb(0.82, 0.86, 0.92)
+
+  // Resolución de colores dinámicos con fallbacks institucionales
+  const colorFondoRolHex = datos.colorFondoRol || datos.color_fondo_rol_escarapela || datos.colorSecundarioHex || '#D2202E'
+  const colorTextoRolHex = datos.colorTextoRol || datos.color_texto_rol_escarapela || '#FFFFFF'
+  const colorNombreHex = datos.colorNombre || datos.color_nombre_escarapela || datos.colorPrimarioHex || '#0B305B'
+  const colorCarreraHex = datos.colorCarrera || datos.color_carrera_escarapela || '#526176'
+
+  const colorFondoRolRgb = parsearHexARgb(colorFondoRolHex, colorRojo)
+  const colorTextoRolRgb = parsearHexARgb(colorTextoRolHex, rgb(1, 1, 1))
+  const colorNombreRgb = parsearHexARgb(colorNombreHex, colorAzulMarino)
+  const colorCarreraRgb = parsearHexARgb(colorCarreraHex, colorGris)
 
   // 1. Cargar plantilla de fondo si fue provista
   const imagenFondo = await cargarEIncrustarImagen(pdfDoc, datos.fondoUrl)
@@ -237,39 +296,65 @@ export async function generarPdfEscarapela(datos: DatosEscarapela): Promise<Uint
   const pillX = (width - pillW) / 2
   const pillY = imagenFondo ? 222 : 248
 
-  page.drawRectangle({
-    x: pillX,
-    y: pillY,
-    width: pillW,
-    height: pillH,
-    color: colorRojo,
-  })
+  const estiloRol = (datos.estiloRol || datos.estilo_etiqueta_rol || 'SOLIDO').toUpperCase().trim()
+  const pathPildora = generarPathRectanguloRedondeado(pillW, pillH, pillH / 2)
+  let colorTextoFinal = colorTextoRolRgb
+
+  if (estiloRol === 'CONTORNO_CURVO') {
+    // Dibujar píldora contorneada redondeada (borde curvo y fondo transparente)
+    // Se compensa la inversión de coordenadas de drawSvgPath usando y: pillY + pillH
+    page.drawSvgPath(pathPildora, {
+      x: pillX,
+      y: pillY + pillH,
+      borderColor: colorFondoRolRgb,
+      borderWidth: 1.2,
+    })
+    // Si el texto es blanco puro sobre fondo claro sin relleno, alternar a colorFondoRolRgb para legibilidad
+    if (colorTextoRolHex.toUpperCase() === '#FFFFFF' || colorTextoRolHex.toUpperCase() === '#FFF') {
+      colorTextoFinal = colorFondoRolRgb
+    }
+  } else if (estiloRol === 'TEXTO_LIBRE') {
+    // Modo minimalista: omitir contenedor gráfico y usar color destacado para el texto
+    if (colorTextoRolHex.toUpperCase() === '#FFFFFF' || colorTextoRolHex.toUpperCase() === '#FFF') {
+      colorTextoFinal = colorFondoRolRgb
+    }
+  } else {
+    // Por defecto 'SOLIDO': diseño original garantizado con page.drawRectangle nativo
+    page.drawRectangle({
+      x: pillX,
+      y: pillY,
+      width: pillW,
+      height: pillH,
+      color: colorFondoRolRgb,
+    })
+  }
 
   page.drawText(rolTexto, {
     x: (width - wRolTexto) / 2,
-    y: pillY + 4,
+    y: pillY + (pillH - sizeRol) / 2 + 0.5,
     size: sizeRol,
     font: fontBold,
-    color: rgb(1, 1, 1),
+    color: colorTextoFinal,
   })
 
   // =========================================================================
   // 3. NOMBRE DEL ASISTENTE (Centrado matemático horizontal)
   // =========================================================================
   const nombreMayus = (datos.alumnoNombre || 'ESTUDIANTE UNISINÚ').toUpperCase().trim()
-  let tamanoNombre = 12.5
-  if (nombreMayus.length > 22) tamanoNombre = 10.5
-  if (nombreMayus.length > 30) tamanoNombre = 9
+  const baseTamanoNombre = Number(datos.tamanoNombre || datos.tamano_nombre_escarapela) || 12.5
+  let tamanoNombreFinal = baseTamanoNombre
+  if (nombreMayus.length > 22) tamanoNombreFinal = Math.max(baseTamanoNombre - 2, 8.5)
+  if (nombreMayus.length > 30) tamanoNombreFinal = Math.max(baseTamanoNombre - 3.5, 7.5)
 
-  const wNombre = fontBold.widthOfTextAtSize(nombreMayus, tamanoNombre)
+  const wNombre = fontBold.widthOfTextAtSize(nombreMayus, tamanoNombreFinal)
   const yNombre = pillY - 24
 
   page.drawText(nombreMayus, {
     x: (width - wNombre) / 2,
     y: yNombre,
-    size: tamanoNombre,
+    size: tamanoNombreFinal,
     font: fontBold,
-    color: colorAzulMarino,
+    color: colorNombreRgb,
   })
 
   // Línea sutil bajo el nombre
@@ -299,7 +384,7 @@ export async function generarPdfEscarapela(datos: DatosEscarapela): Promise<Uint
   })
 
   const carreraTexto = (datos.alumnoCarrera || 'Facultad de Ingenierías').trim()
-  const sizeCarrera = 7
+  const sizeCarrera = Number(datos.tamanoCarrera || datos.tamano_carrera_escarapela) || 7
   const wCarrera = fontRegular.widthOfTextAtSize(carreraTexto, sizeCarrera)
   const yCarrera = yCedula - 13
 
@@ -308,7 +393,7 @@ export async function generarPdfEscarapela(datos: DatosEscarapela): Promise<Uint
     y: yCarrera,
     size: sizeCarrera,
     font: fontRegular,
-    color: colorGris,
+    color: colorCarreraRgb,
   })
 
   // =========================================================================
@@ -386,7 +471,7 @@ export async function descargarEscarapelaPdf(
   nombreArchivo?: string
 ): Promise<void> {
   const pdfBytes = await generarPdfEscarapela(datos)
-  const blob = new Blob([pdfBytes], { type: 'application/pdf' })
+  const blob = new Blob([pdfBytes as any], { type: 'application/pdf' })
   const url = URL.createObjectURL(blob)
 
   const link = document.createElement('a')
