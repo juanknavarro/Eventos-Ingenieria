@@ -61,6 +61,16 @@ export async function GET(
       firmaDirectorUrl: ev.firma_director_url,
       nombreFirmante2: ev.nombre_firmante_2,
       cargoFirmante2: ev.cargo_firmante_2,
+      fuenteCertificado: ev.fuente_certificado,
+      fuentePersonalizadaUrl: ev.fuente_personalizada_url,
+      fuente_personalizada_url: ev.fuente_personalizada_url,
+      colorNombreAlumno: ev.color_nombre_alumno,
+      colorTextoPrincipal: ev.color_texto_principal,
+      tamanoNombreAlumno: ev.tamano_nombre_alumno,
+      tamanoParticipacion: ev.tamano_participacion,
+      colorFirmantes: ev.color_firmantes,
+      mensajeParticipacion: ev.mensaje_participacion,
+      intensidadHoraria: ev.intensidad_horaria,
     })
 
     return new NextResponse(Buffer.from(pdfBytes), {

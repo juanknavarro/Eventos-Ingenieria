@@ -35,6 +35,7 @@ import {
   Mail,
   Phone,
   Award,
+  QrCode,
 } from 'lucide-react'
 import { RolUsuario, EstadoEvento } from '@prisma/client'
 import {
@@ -614,6 +615,14 @@ export default function PanelAdminCliente({
 
                   {/* Acciones del Evento */}
                   <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <Link
+                      href={`/admin/eventos/${evento.id}/escaner`}
+                      className="py-1.5 px-3 bg-[#0B305B] hover:bg-[#07213e] text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                      title="Abrir Escáner QR de Asistencia"
+                    >
+                      <QrCode className="w-3.5 h-3.5 text-white" />
+                      <span className="hidden sm:inline">Escanear QR</span>
+                    </Link>
                     <Link
                       href={`/admin/eventos/nuevo?id=${evento.id}`}
                       className="flex-1 py-1.5 px-3 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"

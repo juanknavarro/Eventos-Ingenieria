@@ -54,6 +54,8 @@ export async function GET(
       colorFondoRol: ev?.color_fondo_rol_escarapela,
       colorTextoRol: ev?.color_texto_rol_escarapela,
       estiloRol: ev?.estilo_etiqueta_rol,
+      fuentePersonalizadaUrl: ev?.fuente_personalizada_url,
+      fuente_personalizada_url: ev?.fuente_personalizada_url,
     })
 
     return new NextResponse(Buffer.from(pdfBytes), {

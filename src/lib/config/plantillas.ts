@@ -14,8 +14,11 @@ export interface ConfiguracionPlantillasData {
   titulo_convocatoria: string
   descripcion_convocatoria: string
   caracteristica_1?: string | null
+  icono_1?: string | null
   caracteristica_2?: string | null
+  icono_2?: string | null
   caracteristica_3?: string | null
+  icono_3?: string | null
   contacto_correo?: string | null
   contacto_telefono?: string | null
   contacto_ubicacion?: string | null

@@ -13,6 +13,7 @@ export interface ValidarAsistenciaInput {
 }
 
 export type TipoResultadoAsistencia =
+  | 'EXITO'
   | 'ACCESO_CONCEDIDO'
   | 'NO_ENCONTRADO'
   | 'NO_INSCRITO'
@@ -93,16 +94,28 @@ export async function registrarAsistenciaPorDocumento({
       }
     }
 
-    // 1. Buscar al usuario por código estudiantil, email o ID
-    const usuario = await prisma.usuario.findFirst({
+    // 1. Buscar al usuario por cédula, código estudiantil, email o ID
+    let usuario = await prisma.usuario.findFirst({
       where: {
         OR: [
+          { cedula: docLimpio },
           { codigoEstudiantil: docLimpio },
           { email: docLimpio },
           { id: docLimpio },
         ],
       },
     })
+
+    // Fallback: Si el QR trajo directamente el ID de la inscripción
+    if (!usuario) {
+      const inscripcionDirecta = await prisma.inscripcion.findUnique({
+        where: { id: docLimpio },
+        include: { usuario: true },
+      })
+      if (inscripcionDirecta) {
+        usuario = inscripcionDirecta.usuario
+      }
+    }
 
     if (!usuario) {
       return {
@@ -273,7 +286,7 @@ export async function registrarAsistenciaPorDocumento({
 
     return {
       success: true,
-      tipo: 'ACCESO_CONCEDIDO',
+      tipo: 'EXITO',
       mensaje: `¡ACCESO PERMITIDO! Asistencia confirmada para ${usuario.nombre}.`,
       usuario: {
         id: usuario.id,
@@ -311,4 +324,48 @@ export async function registrarAsistenciaPorDocumento({
     }
   }
 }
+
+export async function obtenerInfoEventoEscaner(eventoId: string) {
+  try {
+    const session = await getAuthSession()
+    if (!session) {
+      return { success: false, error: 'No autenticado' }
+    }
+
+    const evento = await prisma.evento.findUnique({
+      where: { id: eventoId },
+      select: {
+        id: true,
+        titulo: true,
+        ubicacion: true,
+        capacidadMaxima: true,
+        _count: {
+          select: { inscripciones: true },
+        },
+      },
+    })
+
+    if (!evento) {
+      return { success: false, error: 'Evento no encontrado' }
+    }
+
+    const totalAsistencias = await prisma.asistencia.count({
+      where: {
+        inscripcion: {
+          eventoId: eventoId,
+        },
+      },
+    })
+
+    return {
+      success: true,
+      evento,
+      totalAsistencias,
+    }
+  } catch (error) {
+    console.error('Error al obtener info de evento para escáner:', error)
+    return { success: false, error: 'Error interno del servidor' }
+  }
+}
+
 

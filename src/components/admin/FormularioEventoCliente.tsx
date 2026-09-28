@@ -22,12 +22,14 @@ import {
   Eye,
   Palette,
   ChevronDown,
+  Trash2,
 } from 'lucide-react'
 import { EstadoEvento } from '@prisma/client'
 import { crearEvento, actualizarEvento } from '@/actions/admin'
 import SelectorRecursoGrafico from '@/components/admin/SelectorRecursoGrafico'
 import { generarCertificadoPdf } from '@/lib/pdf/generador'
 import { generarPdfEscarapela } from '@/lib/pdf/generadorEscarapela'
+import { extraerPaleta } from '@/lib/utils/extractorColores'
 
 interface EventoInicial {
   id: string
@@ -58,6 +60,8 @@ interface EventoInicial {
   programa_academico?: string | null
   // Estilos visuales y tipografía dinámica (Diploma)
   fuente_certificado?: string | null
+  fuente_personalizada_url?: string | null
+  fuente_personalizada_nombre?: string | null
   color_nombre_alumno?: string | null
   color_texto_principal?: string | null
   tamano_nombre_alumno?: number | null
@@ -95,6 +99,8 @@ export default function FormularioEventoCliente({
   const [generandoCertificado, setGenerandoCertificado] = useState(false)
   const [mensajeExito, setMensajeExito] = useState<string | null>(null)
   const [mensajeError, setMensajeError] = useState<string | null>(null)
+  const [eliminarFuenteCustom, setEliminarFuenteCustom] = useState(false)
+  const inputFuenteRef = useRef<HTMLInputElement>(null)
 
   // Estados sincronizados para los controles de color (Diploma)
   const [estilosAbiertos, setEstilosAbiertos] = useState(true)
@@ -109,6 +115,61 @@ export default function FormularioEventoCliente({
   const [colorCarreraEsc, setColorCarreraEsc] = useState(eventoInicial?.color_carrera_escarapela || '#526176')
   const [colorFondoRolEsc, setColorFondoRolEsc] = useState(eventoInicial?.color_fondo_rol_escarapela || '#D2202E')
   const [colorTextoRolEsc, setColorTextoRolEsc] = useState(eventoInicial?.color_texto_rol_escarapela || '#FFFFFF')
+
+  // Paletas de color extraídas de las plantillas gráficas
+  const [paletaDiploma, setPaletaDiploma] = useState<string[]>([])
+  const [paletaEscarapela, setPaletaEscarapela] = useState<string[]>([])
+
+  // Extracción automática inicial si hay plantillas existentes
+  React.useEffect(() => {
+    if (eventoInicial?.certificado_plantilla_url) {
+      extraerPaleta(eventoInicial.certificado_plantilla_url).then((colores) => {
+        if (colores.length > 0) setPaletaDiploma(colores)
+      })
+    }
+    const plantillaEsc = eventoInicial?.escarapela_plantilla_url || eventoInicial?.logo_fondo_url
+    if (plantillaEsc) {
+      extraerPaleta(plantillaEsc).then((colores) => {
+        if (colores.length > 0) setPaletaEscarapela(colores)
+      })
+    }
+  }, [eventoInicial?.certificado_plantilla_url, eventoInicial?.escarapela_plantilla_url, eventoInicial?.logo_fondo_url])
+
+  const handleCambioPlantillaDiploma = async (recurso: File | string | null) => {
+    if (!recurso) {
+      setPaletaDiploma([])
+      return
+    }
+    const colores = await extraerPaleta(recurso)
+    setPaletaDiploma(colores)
+  }
+
+  const handleCambioPlantillaEscarapela = async (recurso: File | string | null) => {
+    if (!recurso) {
+      setPaletaEscarapela([])
+      return
+    }
+    const colores = await extraerPaleta(recurso)
+    setPaletaEscarapela(colores)
+  }
+
+  const aplicarColorYPrevisualizar = (
+    setter: (c: string) => void,
+    campo: string,
+    color: string,
+    tipo: 'certificado' | 'escarapela'
+  ) => {
+    setter(color)
+    if (formRef.current) {
+      const input = formRef.current.elements.namedItem(campo) as HTMLInputElement | null
+      if (input) {
+        input.value = color
+      }
+    }
+    setTimeout(() => {
+      handleVistaPrevia(tipo)
+    }, 100)
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -217,6 +278,13 @@ export default function FormularioEventoCliente({
     const imagenCentralUrl = getUrlOArchivoLocal('imagen_central_url', 'archivo_imagen_central', eventoInicial?.imagen_central_url)
     const logoFondoUrl = getUrlOArchivoLocal('logo_fondo_url', 'archivo_logo_fondo', eventoInicial?.logo_fondo_url)
     const sponsorsUrl = getUrlOArchivoLocal('sponsors_url', 'archivo_sponsors', eventoInicial?.sponsors_url)
+    const archivoFuente = formData.get('archivo_fuente_personalizada') as File | null
+    let fuentePersonalizadaUrl: string | null = null
+    if (archivoFuente && archivoFuente.size > 0 && !eliminarFuenteCustom) {
+      fuentePersonalizadaUrl = URL.createObjectURL(archivoFuente)
+    } else if (!eliminarFuenteCustom) {
+      fuentePersonalizadaUrl = (formData.get('fuente_personalizada_url') as string)?.trim() || eventoInicial?.fuente_personalizada_url || null
+    }
 
     // Alumno simulado
     const ESTUDIANTE_MOCK = {
@@ -251,6 +319,7 @@ export default function FormularioEventoCliente({
           asistenciaId: 'PREVIEW-CERT-2026',
           // Estilos dinámicos
           fuenteCertificado,
+          fuentePersonalizadaUrl,
           colorNombreAlumno,
           colorTextoPrincipal,
           tamanoNombreAlumno,
@@ -285,6 +354,8 @@ export default function FormularioEventoCliente({
           colorSecundarioHex: '#D2202E',
           qrPayload: `PREVIEW-ESCARAPELA-${ESTUDIANTE_MOCK.alumnoCodigo}`,
           inscripcionId: 'PREVIEW-ESCARAPELA-123',
+          fuentePersonalizadaUrl,
+          fuente_personalizada_url: fuentePersonalizadaUrl,
           // Estilos dinámicos y colores personalizados
           tamanoNombre: tamanoNombreEsc,
           tamano_nombre_escarapela: tamanoNombreEsc,
@@ -655,6 +726,7 @@ export default function FormularioEventoCliente({
               nombreCampoArchivo="archivo_escarapela_plantilla"
               valorInicialUrl={eventoInicial?.escarapela_plantilla_url}
               aspectoRecomendado="Vertical Carnet (90 x 130 mm / 255 x 368 pt)"
+              onRecursoChange={handleCambioPlantillaEscarapela}
             />
 
             {/* 1. Imagen Central del Evento */}
@@ -789,9 +861,29 @@ export default function FormularioEventoCliente({
 
                 {/* 3. Paleta Cromática */}
                 <div className="space-y-3 pt-2 border-t border-slate-100">
-                  <span className="text-xs font-bold text-slate-700 block">
-                    Paleta Cromática de la Escarapela
-                  </span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                    <span className="text-xs font-bold text-slate-700 block">
+                      Paleta Cromática de la Escarapela
+                    </span>
+                    {paletaEscarapela.length > 0 && (
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-xl text-[10px] text-slate-600 font-semibold border border-slate-200">
+                        <Sparkles className="w-3 h-3 text-[#0B305B]" />
+                        <span>Colores de la plantilla:</span>
+                        <div className="flex items-center gap-1">
+                          {paletaEscarapela.map((hex, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => aplicarColorYPrevisualizar(setColorNombreEsc, 'color_nombre_escarapela', hex, 'escarapela')}
+                              style={{ backgroundColor: hex }}
+                              className="w-3.5 h-3.5 rounded-full border border-white shadow-2xs hover:scale-130 transition-transform cursor-pointer"
+                              title={`Color de plantilla: ${hex} (clic para aplicar al nombre)`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {/* Color Nombre */}
@@ -815,6 +907,21 @@ export default function FormularioEventoCliente({
                           className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-medium outline-none focus:border-[#0B305B]"
                         />
                       </div>
+                      {paletaEscarapela.length > 0 && (
+                        <div className="flex items-center gap-1 pt-1 flex-wrap">
+                          <span className="text-[10px] text-slate-400 font-medium">Sugeridos:</span>
+                          {paletaEscarapela.map((hex, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => aplicarColorYPrevisualizar(setColorNombreEsc, 'color_nombre_escarapela', hex, 'escarapela')}
+                              style={{ backgroundColor: hex }}
+                              className="w-4 h-4 rounded-full border border-slate-300 hover:scale-125 transition-transform cursor-pointer shadow-2xs"
+                              title={`Aplicar ${hex} al nombre`}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* Color Carrera */}
@@ -838,6 +945,21 @@ export default function FormularioEventoCliente({
                           className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-medium outline-none focus:border-[#0B305B]"
                         />
                       </div>
+                      {paletaEscarapela.length > 0 && (
+                        <div className="flex items-center gap-1 pt-1 flex-wrap">
+                          <span className="text-[10px] text-slate-400 font-medium">Sugeridos:</span>
+                          {paletaEscarapela.map((hex, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => aplicarColorYPrevisualizar(setColorCarreraEsc, 'color_carrera_escarapela', hex, 'escarapela')}
+                              style={{ backgroundColor: hex }}
+                              className="w-4 h-4 rounded-full border border-slate-300 hover:scale-125 transition-transform cursor-pointer shadow-2xs"
+                              title={`Aplicar ${hex} a la carrera`}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* Color Fondo Rol (Píldora / Borde) */}
@@ -873,6 +995,21 @@ export default function FormularioEventoCliente({
                           className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-medium outline-none focus:border-[#0B305B]"
                         />
                       </div>
+                      {paletaEscarapela.length > 0 && (
+                        <div className="flex items-center gap-1 pt-1 flex-wrap">
+                          <span className="text-[10px] text-slate-400 font-medium">Sugeridos:</span>
+                          {paletaEscarapela.map((hex, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => aplicarColorYPrevisualizar(setColorFondoRolEsc, 'color_fondo_rol_escarapela', hex, 'escarapela')}
+                              style={{ backgroundColor: hex }}
+                              className="w-4 h-4 rounded-full border border-slate-300 hover:scale-125 transition-transform cursor-pointer shadow-2xs"
+                              title={`Aplicar ${hex} al fondo del rol`}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* Color Texto Rol */}
@@ -903,6 +1040,21 @@ export default function FormularioEventoCliente({
                           className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-medium outline-none focus:border-[#0B305B]"
                         />
                       </div>
+                      {paletaEscarapela.length > 0 && (
+                        <div className="flex items-center gap-1 pt-1 flex-wrap">
+                          <span className="text-[10px] text-slate-400 font-medium">Sugeridos:</span>
+                          {paletaEscarapela.map((hex, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => aplicarColorYPrevisualizar(setColorTextoRolEsc, 'color_texto_rol_escarapela', hex, 'escarapela')}
+                              style={{ backgroundColor: hex }}
+                              className="w-4 h-4 rounded-full border border-slate-300 hover:scale-125 transition-transform cursor-pointer shadow-2xs"
+                              title={`Aplicar ${hex} al texto del rol`}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -953,6 +1105,7 @@ export default function FormularioEventoCliente({
               nombreCampoArchivo="archivo_certificado_plantilla"
               valorInicialUrl={eventoInicial?.certificado_plantilla_url}
               aspectoRecomendado="Horizontal A4 (842 x 595 px / 1.41:1)"
+              onRecursoChange={handleCambioPlantillaDiploma}
             />
 
             {/* Intensidad Horaria */}
@@ -1091,7 +1244,7 @@ export default function FormularioEventoCliente({
                 {/* 1. Selector de Tipografía */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
-                    <span>Familia Tipográfica Oficial</span>
+                    <span>Familia Tipográfica Oficial (Estándar)</span>
                     <span className="text-[10px] text-slate-400 font-mono">fuente_certificado</span>
                   </label>
                   <select
@@ -1109,6 +1262,86 @@ export default function FormularioEventoCliente({
                       <option value="Playfair">Playfair / Académica</option>
                     </optgroup>
                   </select>
+                </div>
+
+                {/* Subir Archivo de Fuente Personalizada (.ttf / .otf) */}
+                <div className="space-y-1.5 p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200">
+                  <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-[#0B305B]" />
+                      Subir Tipografía Personalizada (.ttf / .otf)
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">archivo_fuente_personalizada</span>
+                  </label>
+                  <p className="text-[11px] text-slate-500">
+                    Sube tu propio archivo de fuente (.ttf o .otf) para aplicar en el Nombre del Alumno y Título del Evento tanto en Diplomas como en Escarapelas.
+                  </p>
+                  <input
+                    ref={inputFuenteRef}
+                    type="file"
+                    name="archivo_fuente_personalizada"
+                    accept=".ttf,.otf,font/ttf,font/otf"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        setEliminarFuenteCustom(false)
+                      }
+                    }}
+                    className="w-full text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-[#0B305B] file:text-white hover:file:bg-[#0B305B]/90 file:cursor-pointer cursor-pointer border border-slate-200 rounded-xl bg-white p-1.5"
+                  />
+                  <input
+                    type="hidden"
+                    name="fuente_personalizada_url"
+                    defaultValue={eventoInicial?.fuente_personalizada_url || ''}
+                  />
+                  <input
+                    type="hidden"
+                    name="fuente_personalizada_nombre"
+                    defaultValue={eventoInicial?.fuente_personalizada_nombre || ''}
+                  />
+                  {eliminarFuenteCustom && (
+                    <input type="hidden" name="eliminar_fuente_custom" value="true" />
+                  )}
+
+                  {!eliminarFuenteCustom && eventoInicial?.fuente_personalizada_url && (
+                    <div className="flex items-center justify-between gap-2 text-[11px] text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200/60 font-medium">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
+                        <span className="truncate">
+                          Tipografía activa:{' '}
+                          <strong>{eventoInicial.fuente_personalizada_nombre || 'Fuente personalizada cargada'}</strong>
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEliminarFuenteCustom(true)
+                          if (inputFuenteRef.current) {
+                            inputFuenteRef.current.value = ''
+                          }
+                        }}
+                        className="shrink-0 px-2.5 py-1 bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-xs"
+                        title="Eliminar tipografía personalizada y volver a la estándar"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                        <span>Eliminar</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {eliminarFuenteCustom && (
+                    <div className="flex items-center justify-between gap-2 text-[11px] text-rose-700 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200/60 font-medium">
+                      <span className="truncate">
+                        🗑️ Tipografía personalizada marcada para eliminar (se usará la oficial estándar).
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setEliminarFuenteCustom(false)}
+                        className="shrink-0 text-[10px] text-slate-500 hover:text-slate-800 underline font-semibold cursor-pointer"
+                      >
+                        Deshacer
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. Tamaños Tipográficos */}
@@ -1148,9 +1381,29 @@ export default function FormularioEventoCliente({
 
                 {/* 3. Colores Dinámicos (Color Picker + Input HEX) */}
                 <div className="space-y-3 pt-2 border-t border-slate-100">
-                  <span className="text-xs font-bold text-slate-700 block">
-                    Paleta Cromática de Textos
-                  </span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                    <span className="text-xs font-bold text-slate-700 block">
+                      Paleta Cromática de Textos (Diploma)
+                    </span>
+                    {paletaDiploma.length > 0 && (
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-xl text-[10px] text-slate-600 font-semibold border border-slate-200">
+                        <Sparkles className="w-3 h-3 text-[#0B305B]" />
+                        <span>Colores de la plantilla:</span>
+                        <div className="flex items-center gap-1">
+                          {paletaDiploma.map((hex, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => aplicarColorYPrevisualizar(setColorNombre, 'color_nombre_alumno', hex, 'certificado')}
+                              style={{ backgroundColor: hex }}
+                              className="w-3.5 h-3.5 rounded-full border border-white shadow-2xs hover:scale-130 transition-transform cursor-pointer"
+                              title={`Color de plantilla: ${hex} (clic para aplicar al nombre)`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Color Nombre Alumno */}
                   <div className="space-y-1">
@@ -1173,6 +1426,21 @@ export default function FormularioEventoCliente({
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-medium outline-none focus:border-[#0B305B]"
                       />
                     </div>
+                    {paletaDiploma.length > 0 && (
+                      <div className="flex items-center gap-1 pt-1 flex-wrap">
+                        <span className="text-[10px] text-slate-400 font-medium">Sugeridos:</span>
+                        {paletaDiploma.map((hex, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => aplicarColorYPrevisualizar(setColorNombre, 'color_nombre_alumno', hex, 'certificado')}
+                            style={{ backgroundColor: hex }}
+                            className="w-4 h-4 rounded-full border border-slate-300 hover:scale-125 transition-transform cursor-pointer shadow-2xs"
+                            title={`Aplicar ${hex} al nombre`}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Color Texto Principal / Cuerpo */}
@@ -1196,6 +1464,21 @@ export default function FormularioEventoCliente({
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-medium outline-none focus:border-[#0B305B]"
                       />
                     </div>
+                    {paletaDiploma.length > 0 && (
+                      <div className="flex items-center gap-1 pt-1 flex-wrap">
+                        <span className="text-[10px] text-slate-400 font-medium">Sugeridos:</span>
+                        {paletaDiploma.map((hex, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => aplicarColorYPrevisualizar(setColorTexto, 'color_texto_principal', hex, 'certificado')}
+                            style={{ backgroundColor: hex }}
+                            className="w-4 h-4 rounded-full border border-slate-300 hover:scale-125 transition-transform cursor-pointer shadow-2xs"
+                            title={`Aplicar ${hex} a la declaración`}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Color Firmas */}
@@ -1219,6 +1502,21 @@ export default function FormularioEventoCliente({
                         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-medium outline-none focus:border-[#0B305B]"
                       />
                     </div>
+                    {paletaDiploma.length > 0 && (
+                      <div className="flex items-center gap-1 pt-1 flex-wrap">
+                        <span className="text-[10px] text-slate-400 font-medium">Sugeridos:</span>
+                        {paletaDiploma.map((hex, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => aplicarColorYPrevisualizar(setColorFirmas, 'color_firmantes', hex, 'certificado')}
+                            style={{ backgroundColor: hex }}
+                            className="w-4 h-4 rounded-full border border-slate-300 hover:scale-125 transition-transform cursor-pointer shadow-2xs"
+                            title={`Aplicar ${hex} a los firmantes`}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

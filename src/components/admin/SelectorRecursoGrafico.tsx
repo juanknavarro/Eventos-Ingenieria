@@ -17,6 +17,7 @@ interface Props {
   nombreCampoArchivo: string
   valorInicialUrl?: string | null
   aspectoRecomendado?: string
+  onRecursoChange?: (recurso: File | string | null) => void
 }
 
 export default function SelectorRecursoGrafico({
@@ -26,6 +27,7 @@ export default function SelectorRecursoGrafico({
   nombreCampoArchivo,
   valorInicialUrl = '',
   aspectoRecomendado,
+  onRecursoChange,
 }: Props) {
   const [modo, setModo] = useState<'url' | 'archivo'>('url')
   const [urlIngresada, setUrlIngresada] = useState(valorInicialUrl || '')
@@ -40,6 +42,7 @@ export default function SelectorRecursoGrafico({
       setArchivoSeleccionado(file)
       const urlPreview = URL.createObjectURL(file)
       setPreviewLocal(urlPreview)
+      onRecursoChange?.(file)
     }
   }
 
@@ -52,6 +55,7 @@ export default function SelectorRecursoGrafico({
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
+    onRecursoChange?.(null)
   }
 
   return (
@@ -103,14 +107,20 @@ export default function SelectorRecursoGrafico({
               type="text"
               name={nombreCampoUrl}
               value={urlIngresada}
-              onChange={(e) => setUrlIngresada(e.target.value)}
+              onChange={(e) => {
+                setUrlIngresada(e.target.value)
+                onRecursoChange?.(e.target.value)
+              }}
               placeholder="https://... o ruta relativa ej. /uploads/imagen.png"
               className="w-full pl-3 pr-8 py-2 bg-white border border-slate-200 focus:border-[#0B305B] rounded-xl text-xs outline-none transition"
             />
             {urlIngresada && (
               <button
                 type="button"
-                onClick={() => setUrlIngresada('')}
+                onClick={() => {
+                  setUrlIngresada('')
+                  onRecursoChange?.(null)
+                }}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
               >
                 <X className="w-3.5 h-3.5" />

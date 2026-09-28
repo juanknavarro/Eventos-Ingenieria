@@ -1,4 +1,5 @@
-import { PDFDocument, rgb, StandardFonts, PDFImage } from 'pdf-lib'
+import { PDFDocument, rgb, StandardFonts, PDFImage, PDFFont } from 'pdf-lib'
+import fontkit from '@pdf-lib/fontkit'
 
 export interface DatosGeneracionCertificado {
   alumnoNombre: string
@@ -22,11 +23,50 @@ export interface DatosGeneracionCertificado {
   asistenciaId?: string | null
   // Nuevos estilos visuales y tipografía
   fuenteCertificado?: string | null
+  fuentePersonalizadaUrl?: string | null
+  fuente_personalizada_url?: string | null
   colorNombreAlumno?: string | null
   colorTextoPrincipal?: string | null
   tamanoNombreAlumno?: number | null
   tamanoParticipacion?: number | null
   colorFirmantes?: string | null
+}
+
+/**
+ * Carga e incrusta una tipografía personalizada (.ttf / .otf) de forma segura en el PDF.
+ * Soporta URLs absolutas de Supabase, blob URLs en navegador y rutas relativas.
+ * Si falla la descarga o lectura, retorna null para permitir fallback ininterrumpido a fuentes estándar.
+ */
+async function cargarEIncrustarFuente(
+  pdfDoc: PDFDocument,
+  url: string | null | undefined
+): Promise<PDFFont | null> {
+  if (!url || typeof url !== 'string' || !url.trim()) return null
+
+  try {
+    pdfDoc.registerFontkit(fontkit)
+
+    let bytes: Uint8Array | null = null
+
+    if (typeof window !== 'undefined' || url.startsWith('http') || url.startsWith('blob:') || url.startsWith('/')) {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 6000)
+      const resp = await fetch(url, { signal: controller.signal })
+      clearTimeout(timeoutId)
+
+      if (resp.ok) {
+        const arrayBuffer = await resp.arrayBuffer()
+        bytes = new Uint8Array(arrayBuffer)
+      }
+    }
+
+    if (!bytes || bytes.length === 0) return null
+
+    return await pdfDoc.embedFont(bytes)
+  } catch (err) {
+    console.warn(`[PDF Engine] No se pudo incrustar la fuente personalizada desde ${url}:`, err)
+    return null
+  }
 }
 
 /**
@@ -140,6 +180,14 @@ export async function generarCertificadoPdf(
   const fontOblique = await pdfDoc.embedFont(esSerif ? StandardFonts.TimesRomanItalic : StandardFonts.HelveticaOblique)
   const fontMono = await pdfDoc.embedFont(StandardFonts.Courier)
 
+  // Cargar e incrustar fuente personalizada si fue suministrada (con fallback ininterrumpido a estándar)
+  const fontCustom = await cargarEIncrustarFuente(
+    pdfDoc,
+    datos.fuentePersonalizadaUrl || datos.fuente_personalizada_url
+  )
+  const fontNombre = fontCustom || fontBold
+  const fontTitulo = fontCustom || fontBold
+
   // Paleta institucional Unisinú (Valores base de respaldo)
   const colorAzulMarino = rgb(0.043, 0.188, 0.357) // #0B305B
   const colorRojo = rgb(0.824, 0.125, 0.180) // #D2202E
@@ -239,16 +287,16 @@ export async function generarCertificadoPdf(
   const nombreLimpio = (datos.alumnoNombre || 'ESTUDIANTE UNISINÚ').toUpperCase().trim()
   const tamanoBaseAlumno = Number(datos.tamanoNombreAlumno) > 0 ? Number(datos.tamanoNombreAlumno) : 24
   let sizeNombre = nombreLimpio.length > 32 ? Math.min(tamanoBaseAlumno - 4, 20) : tamanoBaseAlumno
-  let wNombre = fontBold.widthOfTextAtSize(nombreLimpio, sizeNombre)
+  let wNombre = fontNombre.widthOfTextAtSize(nombreLimpio, sizeNombre)
   if (wNombre > width - 100) {
     sizeNombre = Math.max(16, (sizeNombre * (width - 100)) / wNombre)
-    wNombre = fontBold.widthOfTextAtSize(nombreLimpio, sizeNombre)
+    wNombre = fontNombre.widthOfTextAtSize(nombreLimpio, sizeNombre)
   }
   page.drawText(nombreLimpio, {
     x: (width - wNombre) / 2,
     y: 320,
     size: sizeNombre,
-    font: fontBold,
+    font: fontNombre,
     color: colorNombreAlumnoRgb,
   })
 
@@ -295,12 +343,12 @@ export async function generarCertificadoPdf(
   // 6. Nombre del Evento (Centrado horizontal)
   const eventoTexto = `"${(datos.eventoTitulo || 'Evento Académico').trim()}"`
   const sizeEvento = eventoTexto.length > 50 ? 15 : 17.5
-  const wEvento = fontBold.widthOfTextAtSize(eventoTexto, sizeEvento)
+  const wEvento = fontTitulo.widthOfTextAtSize(eventoTexto, sizeEvento)
   page.drawText(eventoTexto, {
     x: (width - wEvento) / 2,
     y: 228,
     size: sizeEvento,
-    font: fontBold,
+    font: fontTitulo,
     color: colorNombreAlumnoRgb,
   })
 

@@ -123,9 +123,11 @@ model Evento {
   cargo_firmante_2          String?  // Cargo del segundo firmante
 
   // Estilos Visuales y Tipografía del Certificado (PDF)
-  fuente_certificado       String?  @default("Montserrat")
-  color_nombre_alumno      String?  @default("#0B305B")
-  color_texto_principal    String?  @default("#1E293B")
+  fuente_certificado          String?  @default("Montserrat")
+  fuente_personalizada_url    String?
+  fuente_personalizada_nombre String?
+  color_nombre_alumno         String?  @default("#0B305B")
+  color_texto_principal       String?  @default("#1E293B")
   tamano_nombre_alumno     Int?     @default(24)
   tamano_participacion     Int?     @default(12)
   color_firmantes          String?  @default("#0F172A")

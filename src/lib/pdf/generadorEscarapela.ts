@@ -1,4 +1,5 @@
-import { PDFDocument, rgb, StandardFonts, PDFImage } from 'pdf-lib'
+import { PDFDocument, rgb, StandardFonts, PDFImage, PDFFont } from 'pdf-lib'
+import fontkit from '@pdf-lib/fontkit'
 import bwipjs from 'bwip-js'
 
 export interface DatosEscarapela {
@@ -33,6 +34,8 @@ export interface DatosEscarapela {
   color_texto_rol_escarapela?: string | null
   estiloRol?: string | null // 'SOLIDO' | 'CONTORNO_CURVO' | 'TEXTO_LIBRE'
   estilo_etiqueta_rol?: string | null
+  fuentePersonalizadaUrl?: string | null
+  fuente_personalizada_url?: string | null
 }
 
 export type DatosGeneracionEscarapela = DatosEscarapela
@@ -110,6 +113,43 @@ async function cargarEIncrustarImagen(
 }
 
 /**
+ * Carga e incrusta una tipografía personalizada (.ttf / .otf) de forma segura en el PDF.
+ * Soporta URLs absolutas de Supabase, blob URLs en navegador y rutas relativas.
+ * Si falla la descarga o lectura, retorna null para permitir fallback ininterrumpido a fuentes estándar.
+ */
+async function cargarEIncrustarFuente(
+  pdfDoc: PDFDocument,
+  url: string | null | undefined
+): Promise<PDFFont | null> {
+  if (!url || typeof url !== 'string' || !url.trim()) return null
+
+  try {
+    pdfDoc.registerFontkit(fontkit)
+
+    let bytes: Uint8Array | null = null
+
+    if (typeof window !== 'undefined' || url.startsWith('http') || url.startsWith('blob:') || url.startsWith('/')) {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 6000)
+      const resp = await fetch(url, { signal: controller.signal })
+      clearTimeout(timeoutId)
+
+      if (resp.ok) {
+        const arrayBuffer = await resp.arrayBuffer()
+        bytes = new Uint8Array(arrayBuffer)
+      }
+    }
+
+    if (!bytes || bytes.length === 0) return null
+
+    return await pdfDoc.embedFont(bytes)
+  } catch (err) {
+    console.warn(`[PDF Engine] No se pudo incrustar la fuente personalizada en escarapela desde ${url}:`, err)
+    return null
+  }
+}
+
+/**
  * Genera los bytes PNG de un código QR en alta resolución utilizando la API de Canvas
  * en el navegador, o el buffer de bwipjs en el servidor (sin dependencias de fs/path).
  */
@@ -171,6 +211,14 @@ export async function generarPdfEscarapela(datos: DatosEscarapela): Promise<Uint
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
   const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica)
   const fontMono = await pdfDoc.embedFont(StandardFonts.CourierBold)
+
+  // Cargar e incrustar fuente personalizada si fue suministrada (con fallback ininterrumpido a estándar)
+  const fontCustom = await cargarEIncrustarFuente(
+    pdfDoc,
+    datos.fuentePersonalizadaUrl || datos.fuente_personalizada_url
+  )
+  const fontNombre = fontCustom || fontBold
+  const fontTitulo = fontCustom || fontBold
 
   // Paleta institucional Universidad del Sinú (defaults)
   const colorAzulMarino = rgb(0.043, 0.188, 0.357) // #0B305B
@@ -265,12 +313,12 @@ export async function generarPdfEscarapela(datos: DatosEscarapela): Promise<Uint
 
     const evTitulo = (datos.eventoTitulo || 'Evento Académico').toUpperCase()
     const evTituloCorto = evTitulo.length > 36 ? evTitulo.substring(0, 33) + '...' : evTitulo
-    const wEv = fontBold.widthOfTextAtSize(evTituloCorto, 7.5)
+    const wEv = fontTitulo.widthOfTextAtSize(evTituloCorto, 7.5)
     page.drawText(evTituloCorto, {
       x: (width - wEv) / 2,
       y: franjaY + 9,
       size: 7.5,
-      font: fontBold,
+      font: fontTitulo,
       color: rgb(1, 1, 1),
     })
 
@@ -346,14 +394,14 @@ export async function generarPdfEscarapela(datos: DatosEscarapela): Promise<Uint
   if (nombreMayus.length > 22) tamanoNombreFinal = Math.max(baseTamanoNombre - 2, 8.5)
   if (nombreMayus.length > 30) tamanoNombreFinal = Math.max(baseTamanoNombre - 3.5, 7.5)
 
-  const wNombre = fontBold.widthOfTextAtSize(nombreMayus, tamanoNombreFinal)
+  const wNombre = fontNombre.widthOfTextAtSize(nombreMayus, tamanoNombreFinal)
   const yNombre = pillY - 24
 
   page.drawText(nombreMayus, {
     x: (width - wNombre) / 2,
     y: yNombre,
     size: tamanoNombreFinal,
-    font: fontBold,
+    font: fontNombre,
     color: colorNombreRgb,
   })
 

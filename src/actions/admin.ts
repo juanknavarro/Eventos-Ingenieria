@@ -146,6 +146,8 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
     const intensidadHoraria = (formData.get('intensidad_horaria') as string)?.trim() || null
 
     const fuenteCertificado = (formData.get('fuente_certificado') as string)?.trim() || 'Montserrat'
+    let fuentePersonalizadaUrl = (formData.get('fuente_personalizada_url') as string)?.trim() || null
+    let fuentePersonalizadaNombre = (formData.get('fuente_personalizada_nombre') as string)?.trim() || null
     const colorNombreAlumno = (formData.get('color_nombre_alumno') as string)?.trim() || '#0B305B'
     const colorTextoPrincipal = (formData.get('color_texto_principal') as string)?.trim() || '#1E293B'
     const tamanoNombreAlumnoStr = formData.get('tamano_nombre_alumno') as string
@@ -232,6 +234,20 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
       }
     }
 
+    // 8. Procesar archivo de Fuente Tipográfica Personalizada (.ttf / .otf) si fue subido o solicitar su eliminación
+    const eliminarFuenteCustom = formData.get('eliminar_fuente_custom') === 'true'
+    const archivoFuente = formData.get('archivo_fuente_personalizada') as File | null
+    if (archivoFuente && archivoFuente.size > 0) {
+      const subida = await subirArchivoRecursosEventos(archivoFuente, 'fuente')
+      if (subida.url) {
+        fuentePersonalizadaUrl = subida.url
+        fuentePersonalizadaNombre = archivoFuente.name
+      }
+    } else if (eliminarFuenteCustom) {
+      fuentePersonalizadaUrl = null
+      fuentePersonalizadaNombre = null
+    }
+
     let programaAcademico =
       (formData.get('programa_academico') as string)?.trim() || 'Facultad de Ingenierías'
     if (session.rol !== RolUsuario.SUPER_ADMIN && session.carrera) {
@@ -260,6 +276,8 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
         mensaje_participacion: mensajeParticipacion,
         intensidad_horaria: intensidadHoraria,
         fuente_certificado: fuenteCertificado,
+        fuente_personalizada_url: fuentePersonalizadaUrl,
+        fuente_personalizada_nombre: fuentePersonalizadaNombre,
         color_nombre_alumno: colorNombreAlumno,
         color_texto_principal: colorTextoPrincipal,
         tamano_nombre_alumno: tamanoNombreAlumno,
@@ -335,6 +353,8 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
     const intensidadHoraria = (formData.get('intensidad_horaria') as string)?.trim() || null
 
     const fuenteCertificado = (formData.get('fuente_certificado') as string)?.trim() || 'Montserrat'
+    let fuentePersonalizadaUrl = (formData.get('fuente_personalizada_url') as string)?.trim() || null
+    let fuentePersonalizadaNombre = (formData.get('fuente_personalizada_nombre') as string)?.trim() || null
     const colorNombreAlumno = (formData.get('color_nombre_alumno') as string)?.trim() || '#0B305B'
     const colorTextoPrincipal = (formData.get('color_texto_principal') as string)?.trim() || '#1E293B'
     const tamanoNombreAlumnoStr = formData.get('tamano_nombre_alumno') as string
@@ -439,6 +459,20 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
       }
     }
 
+    // 8. Procesar archivo de Fuente Tipográfica Personalizada (.ttf / .otf) si fue subido o solicitar su eliminación
+    const eliminarFuenteCustom = formData.get('eliminar_fuente_custom') === 'true'
+    const archivoFuente = formData.get('archivo_fuente_personalizada') as File | null
+    if (archivoFuente && archivoFuente.size > 0) {
+      const subida = await subirArchivoRecursosEventos(archivoFuente, 'fuente')
+      if (subida.url) {
+        fuentePersonalizadaUrl = subida.url
+        fuentePersonalizadaNombre = archivoFuente.name
+      }
+    } else if (eliminarFuenteCustom) {
+      fuentePersonalizadaUrl = null
+      fuentePersonalizadaNombre = null
+    }
+
     await prisma.evento.update({
       where: { id: eventoId },
       data: {
@@ -461,6 +495,8 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
         mensaje_participacion: mensajeParticipacion,
         intensidad_horaria: intensidadHoraria,
         fuente_certificado: fuenteCertificado,
+        fuente_personalizada_url: fuentePersonalizadaUrl,
+        fuente_personalizada_nombre: fuentePersonalizadaNombre,
         color_nombre_alumno: colorNombreAlumno,
         color_texto_principal: colorTextoPrincipal,
         tamano_nombre_alumno: tamanoNombreAlumno,
