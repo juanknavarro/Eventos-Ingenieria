@@ -251,8 +251,18 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
 
     let programaAcademico =
       (formData.get('programa_academico') as string)?.trim() || 'Facultad de Ingenierías'
-    if (session.rol !== RolUsuario.SUPER_ADMIN && session.carrera) {
-      programaAcademico = session.carrera
+
+    // Guarda de seguridad Multi-Tenancy:
+    // Si el usuario es ADMIN, el evento debe guardarse forzosamente con el programa académico de su sesión,
+    // sobrescribiendo cualquier otro valor que intente enviar desde el formulario.
+    if (session.rol === RolUsuario.ADMIN) {
+      if (!session.carrera?.trim()) {
+        return {
+          success: false,
+          error: 'No tienes un programa académico asignado a tu cuenta para crear eventos. Contacta al Súper Administrador.',
+        }
+      }
+      programaAcademico = session.carrera.trim()
     }
 
     await prisma.evento.create({
@@ -382,15 +392,20 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
     }
 
     // Validar aislamiento: ADMIN de programa solo puede editar eventos de su propio programa
-    if (session.rol !== RolUsuario.SUPER_ADMIN && session.carrera) {
+    if (session.rol === RolUsuario.ADMIN || session.rol !== RolUsuario.SUPER_ADMIN) {
+      if (!session.carrera?.trim()) {
+        return {
+          success: false,
+          error: 'No tienes un programa académico asignado a tu cuenta. Contacta al Súper Administrador.',
+        }
+      }
       const eventoActual = await prisma.evento.findUnique({
         where: { id: eventoId },
-        select: { programa_academico: true, organizador: { select: { carrera: true } } },
+        select: { programa_academico: true },
       })
       if (
         eventoActual &&
-        eventoActual.programa_academico !== session.carrera &&
-        !eventoActual.organizador?.carrera?.toLowerCase().includes(session.carrera.toLowerCase())
+        eventoActual.programa_academico !== session.carrera.trim()
       ) {
         return {
           success: false,
@@ -544,15 +559,20 @@ export async function eliminarEvento(eventoId: string): Promise<ActionResult> {
     const session = await asegurarAdmin()
 
     // Validar aislamiento: ADMIN de programa solo puede eliminar eventos de su propio programa
-    if (session.rol !== RolUsuario.SUPER_ADMIN && session.carrera) {
+    if (session.rol === RolUsuario.ADMIN || session.rol !== RolUsuario.SUPER_ADMIN) {
+      if (!session.carrera?.trim()) {
+        return {
+          success: false,
+          error: 'No tienes un programa académico asignado a tu cuenta. Contacta al Súper Administrador.',
+        }
+      }
       const eventoActual = await prisma.evento.findUnique({
         where: { id: eventoId },
-        select: { programa_academico: true, organizador: { select: { carrera: true } } },
+        select: { programa_academico: true },
       })
       if (
         eventoActual &&
-        eventoActual.programa_academico !== session.carrera &&
-        !eventoActual.organizador?.carrera?.toLowerCase().includes(session.carrera.toLowerCase())
+        eventoActual.programa_academico !== session.carrera.trim()
       ) {
         return {
           success: false,

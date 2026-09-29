@@ -1,4 +1,4 @@
-﻿import { AuthSessionUser } from '@/lib/auth/session'
+import { AuthSessionUser } from '@/lib/auth/session'
 import { RolUsuario, Prisma } from '@prisma/client'
 
 /**
@@ -24,9 +24,9 @@ export function obtenerProgramaAcademico(session: AuthSessionUser | null | undef
 }
 
 /**
- * Filtro de Eventos por Multi-Tenancy
+ * Filtro de Eventos por Multi-Tenancy (Zero-Trust)
  * - SUPER_ADMIN: Visión global de todos los eventos.
- * - ADMIN / PROFESOR / STAFF: Solo eventos de su programa académico o creados por personal de su programa.
+ * - ADMIN / PROFESOR / STAFF: Solo eventos estrictamente de su programa académico.
  */
 export function filtroEventosPorTenancy(session: AuthSessionUser): Prisma.EventoWhereInput {
   if (session.rol === RolUsuario.SUPER_ADMIN) {
@@ -34,14 +34,12 @@ export function filtroEventosPorTenancy(session: AuthSessionUser): Prisma.Evento
   }
 
   const programa = obtenerProgramaAcademico(session)
-  if (!programa) return {}
+  if (!programa) {
+    return { id: 'acceso_denegado' }
+  }
 
   return {
-    OR: [
-      { programa_academico: programa },
-      { programa_academico: 'Facultad de Ingenierías' },
-      { organizador: { carrera: { contains: programa, mode: 'insensitive' } } },
-    ],
+    programa_academico: programa,
   }
 }
 
@@ -56,7 +54,9 @@ export function filtroUsuariosPorTenancy(session: AuthSessionUser): Prisma.Usuar
   }
 
   const programa = obtenerProgramaAcademico(session)
-  if (!programa) return {}
+  if (!programa) {
+    return { id: 'acceso_denegado' }
+  }
 
   return {
     carrera: {
@@ -77,7 +77,9 @@ export function filtroInscripcionesPorTenancy(session: AuthSessionUser): Prisma.
   }
 
   const programa = obtenerProgramaAcademico(session)
-  if (!programa) return {}
+  if (!programa) {
+    return { id: 'acceso_denegado' }
+  }
 
   return {
     OR: [
@@ -99,7 +101,9 @@ export function filtroAsignaturasPorTenancy(session: AuthSessionUser): Prisma.As
   }
 
   const programa = obtenerProgramaAcademico(session)
-  if (!programa) return {}
+  if (!programa) {
+    return { id: 'acceso_denegado' }
+  }
 
   return {
     OR: [

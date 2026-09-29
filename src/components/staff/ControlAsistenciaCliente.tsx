@@ -19,9 +19,11 @@ import {
   RotateCcw,
   ArrowLeft,
   GraduationCap,
+  Loader2,
 } from 'lucide-react'
 import {
   registrarAsistenciaPorDocumento,
+  obtenerHistorialEnVivo,
   ResultadoAsistencia,
 } from '@/actions/asistencia'
 
@@ -67,7 +69,7 @@ export interface AsistenciaHistorial {
 interface ControlAsistenciaClienteProps {
   eventos: EventoOption[]
   staffList?: StaffUsuario[]
-  historialInicial: AsistenciaHistorial[]
+  historialInicial?: AsistenciaHistorial[]
   staffActual?: {
     id: string
     nombre: string
@@ -79,7 +81,7 @@ interface ControlAsistenciaClienteProps {
 export default function ControlAsistenciaCliente({
   eventos,
   staffList = [],
-  historialInicial,
+  historialInicial = [],
   staffActual,
 }: ControlAsistenciaClienteProps) {
   // Evento activo
@@ -100,6 +102,7 @@ export default function ControlAsistenciaCliente({
   // Historial local en vivo
   const [historial, setHistorial] =
     useState<AsistenciaHistorial[]>(historialInicial)
+  const [cargandoHistorial, setCargandoHistorial] = useState<boolean>(false)
 
   // Sonido activado
   const [sonidoHabilitado, setSonidoHabilitado] = useState<boolean>(true)
@@ -175,10 +178,36 @@ export default function ControlAsistenciaCliente({
   const eventoSeleccionado = eventos.find((e) => e.id === eventoId)
   const staffSeleccionado = operador
 
-  // Asistencias registradas para el evento actual
-  const asistenciasDelEvento = historial.filter(
-    (h) => h.inscripcion.evento.titulo === eventoSeleccionado?.titulo
-  )
+  // Cargar historial en vivo de hoy cada vez que cambie el evento seleccionado
+  useEffect(() => {
+    let activo = true
+    if (!eventoSeleccionado?.id) {
+      setHistorial([])
+      return
+    }
+
+    const cargarHistorial = async () => {
+      setCargandoHistorial(true)
+      try {
+        const res = await obtenerHistorialEnVivo(eventoSeleccionado.id)
+        if (activo && res.success && res.historial) {
+          setHistorial(res.historial as AsistenciaHistorial[])
+        }
+      } catch (err) {
+        console.error('Error al cargar historial en vivo:', err)
+      } finally {
+        if (activo) {
+          setCargandoHistorial(false)
+        }
+      }
+    }
+
+    cargarHistorial()
+
+    return () => {
+      activo = false
+    }
+  }, [eventoSeleccionado?.id])
 
   // Manejar el submit del escaneo (Lector de código de barras emula teclado + Enter)
   const handleEscaneo = async (e: React.FormEvent) => {
@@ -480,9 +509,9 @@ export default function ControlAsistenciaCliente({
             </div>
           </div>
           <p className="text-3xl font-extrabold text-slate-900 mt-2">
-            {asistenciasDelEvento.length}
+            {historial.length}
           </p>
-          <p className="text-xs text-slate-500 mt-1">Estudiantes en el auditorio</p>
+          <p className="text-xs text-slate-500 mt-1">Estudiantes en el auditorio (hoy)</p>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
@@ -514,7 +543,7 @@ export default function ControlAsistenciaCliente({
           <p className="text-3xl font-extrabold text-teal-600 mt-2">
             {eventoSeleccionado?.capacidadMaxima
               ? `${Math.round(
-                  (asistenciasDelEvento.length /
+                  (historial.length /
                     eventoSeleccionado.capacidadMaxima) *
                     100
                 )}%`
@@ -536,8 +565,9 @@ export default function ControlAsistenciaCliente({
               Registro cronológico de entradas validadas por el equipo de Staff
             </p>
           </div>
-          <span className="text-xs font-bold px-3 py-1 bg-white border border-slate-200 rounded-lg text-slate-700 shadow-sm">
-            {historial.length} ingresos registrados
+          <span className="text-xs font-bold px-3 py-1 bg-white border border-slate-200 rounded-lg text-slate-700 shadow-sm flex items-center gap-1.5">
+            {cargandoHistorial && <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />}
+            {historial.length} ingresos registrados (hoy)
           </span>
         </div>
 

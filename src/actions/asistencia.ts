@@ -368,4 +368,74 @@ export async function obtenerInfoEventoEscaner(eventoId: string) {
   }
 }
 
+/**
+ * Obtiene el historial reciente en vivo para un evento específico filtrado por el día actual
+ */
+export async function obtenerHistorialEnVivo(eventoId: string) {
+  try {
+    const session = await getAuthSession()
+    if (!session) {
+      return { success: false, error: 'No autenticado', historial: [] }
+    }
+
+    if (!eventoId || eventoId === 'TODOS') {
+      return { success: true, historial: [] }
+    }
+
+    const hoy = new Date()
+    hoy.setHours(0, 0, 0, 0)
+
+    const registros = await prisma.asistencia.findMany({
+      where: {
+        inscripcion: {
+          eventoId: eventoId,
+        },
+        fechaHoraRegistro: {
+          gte: hoy,
+        },
+      },
+      include: {
+        inscripcion: {
+          include: {
+            usuario: {
+              select: {
+                nombre: true,
+                codigoEstudiantil: true,
+                carrera: true,
+              },
+            },
+            evento: {
+              select: {
+                titulo: true,
+              },
+            },
+          },
+        },
+        registradoPor: {
+          select: {
+            nombre: true,
+          },
+        },
+      },
+      orderBy: {
+        fechaHoraRegistro: 'desc',
+      },
+      take: 20,
+    })
+
+    return {
+      success: true,
+      historial: registros,
+    }
+  } catch (error) {
+    console.error('Error al obtener historial en vivo:', error)
+    return {
+      success: false,
+      error: 'Error al consultar historial de asistencia.',
+      historial: [],
+    }
+  }
+}
+
+
 

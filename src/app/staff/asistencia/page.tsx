@@ -28,73 +28,21 @@ export default async function ControlAsistenciaStaffPage() {
 
   const filtroEventos = filtroEventosPorTenancy(sesion)
 
-  const filtroAsistencias =
-    sesion.rol === RolUsuario.SUPER_ADMIN || !sesion.carrera
-      ? {}
-      : {
-          OR: [
-            {
-              inscripcion: {
-                usuario: {
-                  carrera: { contains: sesion.carrera, mode: 'insensitive' as const },
-                },
-              },
-            },
-            {
-              inscripcion: {
-                evento: { programa_academico: sesion.carrera },
-              },
-            },
-          ],
-        }
-
-  const [eventos, asistenciasRaw] = await Promise.all([
-    // Consultar eventos activos filtrados por programa
-    prisma.evento.findMany({
-      where: filtroEventos,
-      select: {
-        id: true,
-        titulo: true,
-        precio: true,
-        ubicacion: true,
-        capacidadMaxima: true,
-        _count: {
-          select: { inscripciones: true },
-        },
+  // Consultar eventos activos filtrados por programa
+  const eventos = await prisma.evento.findMany({
+    where: filtroEventos,
+    select: {
+      id: true,
+      titulo: true,
+      precio: true,
+      ubicacion: true,
+      capacidadMaxima: true,
+      _count: {
+        select: { inscripciones: true },
       },
-      orderBy: { fechaInicio: 'asc' },
-    }),
-    // Consultar asistencias recientes con aislamiento
-    prisma.asistencia.findMany({
-      where: filtroAsistencias,
-      include: {
-        inscripcion: {
-          include: {
-            usuario: {
-              select: {
-                nombre: true,
-                codigoEstudiantil: true,
-                carrera: true,
-              },
-            },
-            evento: {
-              select: {
-                titulo: true,
-              },
-            },
-          },
-        },
-        registradoPor: {
-          select: {
-            nombre: true,
-          },
-        },
-      },
-      orderBy: { fechaHoraRegistro: 'desc' },
-      take: 50,
-    }),
-    getAuthSession(),
-  ])
+    },
+    orderBy: { fechaInicio: 'asc' },
+  })
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#061930] via-[#0B305B] to-[#041121] text-slate-100">
@@ -166,7 +114,6 @@ export default async function ControlAsistenciaStaffPage() {
             rol: sesion.rol,
           }}
           eventos={eventos}
-          historialInicial={asistenciasRaw}
         />
       </main>
     </div>
