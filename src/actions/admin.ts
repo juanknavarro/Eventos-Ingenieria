@@ -146,6 +146,7 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
     const intensidadHoraria = (formData.get('intensidad_horaria') as string)?.trim() || null
 
     const fuenteCertificado = (formData.get('fuente_certificado') as string)?.trim() || 'Montserrat'
+    const fuenteCatalogoId = (formData.get('fuente_catalogo_id') as string)?.trim() || null
     let fuentePersonalizadaUrl = (formData.get('fuente_personalizada_url') as string)?.trim() || null
     let fuentePersonalizadaNombre = (formData.get('fuente_personalizada_nombre') as string)?.trim() || null
     const colorNombreAlumno = (formData.get('color_nombre_alumno') as string)?.trim() || '#0B305B'
@@ -276,6 +277,7 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
         mensaje_participacion: mensajeParticipacion,
         intensidad_horaria: intensidadHoraria,
         fuente_certificado: fuenteCertificado,
+        fuente_catalogo_id: fuenteCatalogoId,
         fuente_personalizada_url: fuentePersonalizadaUrl,
         fuente_personalizada_nombre: fuentePersonalizadaNombre,
         color_nombre_alumno: colorNombreAlumno,
@@ -353,6 +355,7 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
     const intensidadHoraria = (formData.get('intensidad_horaria') as string)?.trim() || null
 
     const fuenteCertificado = (formData.get('fuente_certificado') as string)?.trim() || 'Montserrat'
+    const fuenteCatalogoId = (formData.get('fuente_catalogo_id') as string)?.trim() || null
     let fuentePersonalizadaUrl = (formData.get('fuente_personalizada_url') as string)?.trim() || null
     let fuentePersonalizadaNombre = (formData.get('fuente_personalizada_nombre') as string)?.trim() || null
     const colorNombreAlumno = (formData.get('color_nombre_alumno') as string)?.trim() || '#0B305B'
@@ -495,6 +498,7 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
         mensaje_participacion: mensajeParticipacion,
         intensidad_horaria: intensidadHoraria,
         fuente_certificado: fuenteCertificado,
+        fuente_catalogo_id: fuenteCatalogoId,
         fuente_personalizada_url: fuentePersonalizadaUrl,
         fuente_personalizada_nombre: fuentePersonalizadaNombre,
         color_nombre_alumno: colorNombreAlumno,

@@ -23,9 +23,13 @@ import {
   Palette,
   ChevronDown,
   Trash2,
+  Type,
+  ExternalLink,
+  FolderCog,
 } from 'lucide-react'
 import { EstadoEvento } from '@prisma/client'
 import { crearEvento, actualizarEvento } from '@/actions/admin'
+import { listarFuentesCatalogo } from '@/actions/tipografias'
 import SelectorRecursoGrafico from '@/components/admin/SelectorRecursoGrafico'
 import { generarCertificadoPdf } from '@/lib/pdf/generador'
 import { generarPdfEscarapela } from '@/lib/pdf/generadorEscarapela'
@@ -60,6 +64,8 @@ interface EventoInicial {
   programa_academico?: string | null
   // Estilos visuales y tipografía dinámica (Diploma)
   fuente_certificado?: string | null
+  fuente_catalogo_id?: string | null
+  fuenteCatalogo?: { id: string; nombre: string; url: string; familia: string } | null
   fuente_personalizada_url?: string | null
   fuente_personalizada_nombre?: string | null
   color_nombre_alumno?: string | null
@@ -82,6 +88,7 @@ interface Props {
   programaUsuario?: string | null
   esSuperAdmin?: boolean
   programas?: { id: string; nombre: string }[]
+  fuentesCatalogo?: Array<{ id: string; nombre: string; familia: string; url: string; formato: string }>
 }
 
 export default function FormularioEventoCliente({
@@ -89,6 +96,7 @@ export default function FormularioEventoCliente({
   programaUsuario,
   esSuperAdmin = false,
   programas = [],
+  fuentesCatalogo = [],
 }: Props) {
   const router = useRouter()
   const esEdicion = !!eventoInicial
@@ -99,8 +107,25 @@ export default function FormularioEventoCliente({
   const [generandoCertificado, setGenerandoCertificado] = useState(false)
   const [mensajeExito, setMensajeExito] = useState<string | null>(null)
   const [mensajeError, setMensajeError] = useState<string | null>(null)
-  const [eliminarFuenteCustom, setEliminarFuenteCustom] = useState(false)
-  const inputFuenteRef = useRef<HTMLInputElement>(null)
+
+  // Catálogo de fuentes tipográficas y selector unificado
+  const [fuentesDisponibles, setFuentesDisponibles] = useState(fuentesCatalogo)
+  const valorFuenteInicial = eventoInicial?.fuente_catalogo_id
+    ? `custom:${eventoInicial.fuente_catalogo_id}`
+    : `standard:${eventoInicial?.fuente_certificado || 'Montserrat'}`
+  const [fuenteSeleccionada, setFuenteSeleccionada] = useState<string>(valorFuenteInicial)
+
+  React.useEffect(() => {
+    if (!fuentesCatalogo || fuentesCatalogo.length === 0) {
+      listarFuentesCatalogo().then((res) => {
+        if (res.success && res.fuentes) {
+          setFuentesDisponibles(res.fuentes as any)
+        }
+      })
+    } else {
+      setFuentesDisponibles(fuentesCatalogo)
+    }
+  }, [fuentesCatalogo])
 
   // Estados sincronizados para los controles de color (Diploma)
   const [estilosAbiertos, setEstilosAbiertos] = useState(true)
@@ -242,8 +267,26 @@ export default function FormularioEventoCliente({
     const horasAcademicasStr = formData.get('horas_academicas') as string
     const horasAcademicas = horasAcademicasStr ? parseInt(horasAcademicasStr, 10) : (eventoInicial?.horas_academicas || 4)
 
-    // Estilos dinámicos y tipografía extraídos en vivo de la pantalla
-    const fuenteCertificado = (formData.get('fuente_certificado') as string)?.trim() || eventoInicial?.fuente_certificado || 'Montserrat'
+    // Estilos dinámicos y tipografía extraídos en vivo de la pantalla (Catálogo o Estándar)
+    const selectorFuente = (formData.get('selector_fuente') as string)?.trim() || fuenteSeleccionada
+    let fuenteCertificado = 'Montserrat'
+    let fuentePersonalizadaUrl: string | null = null
+
+    if (selectorFuente.startsWith('custom:')) {
+      const customId = selectorFuente.replace('custom:', '')
+      const fuenteEncontrada = fuentesDisponibles.find((f) => f.id === customId)
+      if (fuenteEncontrada) {
+        fuentePersonalizadaUrl = fuenteEncontrada.url
+        fuenteCertificado = fuenteEncontrada.familia || 'Montserrat'
+      }
+    } else {
+      fuenteCertificado = selectorFuente.replace('standard:', '') || 'Montserrat'
+      fuentePersonalizadaUrl = null
+    }
+
+    if (!fuentePersonalizadaUrl && !selectorFuente.startsWith('standard:') && eventoInicial?.fuente_personalizada_url) {
+      fuentePersonalizadaUrl = eventoInicial.fuente_personalizada_url
+    }
     const colorNombreAlumno = (formData.get('color_nombre_alumno') as string)?.trim() || eventoInicial?.color_nombre_alumno || '#0B305B'
     const colorTextoPrincipal = (formData.get('color_texto_principal') as string)?.trim() || eventoInicial?.color_texto_principal || '#1E293B'
     const tamanoNombreAlumnoStr = formData.get('tamano_nombre_alumno') as string
@@ -278,13 +321,6 @@ export default function FormularioEventoCliente({
     const imagenCentralUrl = getUrlOArchivoLocal('imagen_central_url', 'archivo_imagen_central', eventoInicial?.imagen_central_url)
     const logoFondoUrl = getUrlOArchivoLocal('logo_fondo_url', 'archivo_logo_fondo', eventoInicial?.logo_fondo_url)
     const sponsorsUrl = getUrlOArchivoLocal('sponsors_url', 'archivo_sponsors', eventoInicial?.sponsors_url)
-    const archivoFuente = formData.get('archivo_fuente_personalizada') as File | null
-    let fuentePersonalizadaUrl: string | null = null
-    if (archivoFuente && archivoFuente.size > 0 && !eliminarFuenteCustom) {
-      fuentePersonalizadaUrl = URL.createObjectURL(archivoFuente)
-    } else if (!eliminarFuenteCustom) {
-      fuentePersonalizadaUrl = (formData.get('fuente_personalizada_url') as string)?.trim() || eventoInicial?.fuente_personalizada_url || null
-    }
 
     // Alumno simulado
     const ESTUDIANTE_MOCK = {
@@ -319,6 +355,7 @@ export default function FormularioEventoCliente({
           asistenciaId: 'PREVIEW-CERT-2026',
           // Estilos dinámicos
           fuenteCertificado,
+          fuenteCatalogoUrl: fuentePersonalizadaUrl,
           fuentePersonalizadaUrl,
           colorNombreAlumno,
           colorTextoPrincipal,
@@ -354,6 +391,7 @@ export default function FormularioEventoCliente({
           colorSecundarioHex: '#D2202E',
           qrPayload: `PREVIEW-ESCARAPELA-${ESTUDIANTE_MOCK.alumnoCodigo}`,
           inscripcionId: 'PREVIEW-ESCARAPELA-123',
+          fuenteCatalogoUrl: fuentePersonalizadaUrl,
           fuentePersonalizadaUrl,
           fuente_personalizada_url: fuentePersonalizadaUrl,
           // Estilos dinámicos y colores personalizados
@@ -1241,105 +1279,82 @@ export default function FormularioEventoCliente({
 
             {estilosAbiertos && (
               <div className="space-y-4 pt-3 border-t border-slate-100 animate-in fade-in duration-200">
-                {/* 1. Selector de Tipografía */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
-                    <span>Familia Tipográfica Oficial (Estándar)</span>
-                    <span className="text-[10px] text-slate-400 font-mono">fuente_certificado</span>
-                  </label>
+                {/* 1. Selector Unificado de Tipografía (Estándar y Catálogo Global) */}
+                <div className="space-y-2.5 p-4 bg-slate-50/80 rounded-2xl border border-slate-200">
+                  <div className="flex items-center justify-between gap-2">
+                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <Type className="w-3.5 h-3.5 text-[#0B305B]" />
+                      <span>Familia Tipográfica Oficial (Diplomas y Escarapelas)</span>
+                    </label>
+                    <Link
+                      href="/admin/recursos/tipografias"
+                      className="text-[11px] font-bold text-[#0B305B] hover:text-[#D2202E] transition flex items-center gap-1 shrink-0"
+                      title="Abrir Gestor del Catálogo de Tipografías"
+                    >
+                      <FolderCog className="w-3.5 h-3.5" />
+                      <span>Gestionar Catálogo</span>
+                    </Link>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Aplica al Nombre del Alumno y al Título del Evento tanto en el certificado como en el carnet vertical.
+                  </p>
                   <select
-                    name="fuente_certificado"
-                    defaultValue={eventoInicial?.fuente_certificado || 'Montserrat'}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-bold text-slate-800 outline-none transition cursor-pointer"
+                    name="selector_fuente"
+                    value={fuenteSeleccionada}
+                    onChange={(e) => {
+                      const nuevoValor = e.target.value
+                      setFuenteSeleccionada(nuevoValor)
+                      setTimeout(() => {
+                        handleVistaPrevia('certificado')
+                      }, 50)
+                    }}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-200 focus:border-[#0B305B] rounded-xl text-xs font-bold text-slate-800 outline-none transition cursor-pointer shadow-xs"
                   >
-                    <optgroup label="Sans-Serif Modernas (Recomendadas)">
-                      <option value="Montserrat">Montserrat (Limpia y Moderna)</option>
-                      <option value="Roboto">Roboto (Geométrica)</option>
-                      <option value="Helvetica">Helvetica (Estándar Suizo)</option>
+                    <optgroup label="Fuentes Estándar del Sistema (pdf-lib)">
+                      <option value="standard:Montserrat">Montserrat (Limpia y Moderna - Sans)</option>
+                      <option value="standard:Roboto">Roboto (Geométrica - Sans)</option>
+                      <option value="standard:Helvetica">Helvetica (Estándar Suizo - Sans)</option>
+                      <option value="standard:Times">Times New Roman (Solemne / Institucional - Serif)</option>
+                      <option value="standard:Playfair">Playfair / Académica (Serif)</option>
                     </optgroup>
-                    <optgroup label="Serif Clásicas / Solemnes">
-                      <option value="Times">Times New Roman (Solemne / Institucional)</option>
-                      <option value="Playfair">Playfair / Académica</option>
+                    <optgroup label="Mis Fuentes Personalizadas (Catálogo Global)">
+                      {fuentesDisponibles.length === 0 ? (
+                        <option disabled value="">(No hay fuentes subidas en el catálogo global)</option>
+                      ) : (
+                        fuentesDisponibles.map((f) => (
+                          <option key={f.id} value={`custom:${f.id}`}>
+                            ★ {f.nombre} [{f.formato}] &bull; {f.familia}
+                          </option>
+                        ))
+                      )}
                     </optgroup>
                   </select>
-                </div>
 
-                {/* Subir Archivo de Fuente Personalizada (.ttf / .otf) */}
-                <div className="space-y-1.5 p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200">
-                  <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-[#0B305B]" />
-                      Subir Tipografía Personalizada (.ttf / .otf)
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-mono">archivo_fuente_personalizada</span>
-                  </label>
-                  <p className="text-[11px] text-slate-500">
-                    Sube tu propio archivo de fuente (.ttf o .otf) para aplicar en el Nombre del Alumno y Título del Evento tanto en Diplomas como en Escarapelas.
-                  </p>
+                  {/* Inputs ocultos sincronizados que viajan con el FormData al backend */}
                   <input
-                    ref={inputFuenteRef}
-                    type="file"
-                    name="archivo_fuente_personalizada"
-                    accept=".ttf,.otf,font/ttf,font/otf"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files.length > 0) {
-                        setEliminarFuenteCustom(false)
-                      }
-                    }}
-                    className="w-full text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-[#0B305B] file:text-white hover:file:bg-[#0B305B]/90 file:cursor-pointer cursor-pointer border border-slate-200 rounded-xl bg-white p-1.5"
+                    type="hidden"
+                    name="fuente_certificado"
+                    value={
+                      fuenteSeleccionada.startsWith('standard:')
+                        ? fuenteSeleccionada.replace('standard:', '')
+                        : fuentesDisponibles.find((f) => f.id === fuenteSeleccionada.replace('custom:', ''))?.familia || 'Montserrat'
+                    }
                   />
                   <input
                     type="hidden"
-                    name="fuente_personalizada_url"
-                    defaultValue={eventoInicial?.fuente_personalizada_url || ''}
+                    name="fuente_catalogo_id"
+                    value={fuenteSeleccionada.startsWith('custom:') ? fuenteSeleccionada.replace('custom:', '') : ''}
                   />
-                  <input
-                    type="hidden"
-                    name="fuente_personalizada_nombre"
-                    defaultValue={eventoInicial?.fuente_personalizada_nombre || ''}
-                  />
-                  {eliminarFuenteCustom && (
-                    <input type="hidden" name="eliminar_fuente_custom" value="true" />
-                  )}
 
-                  {!eliminarFuenteCustom && eventoInicial?.fuente_personalizada_url && (
-                    <div className="flex items-center justify-between gap-2 text-[11px] text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200/60 font-medium">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
-                        <span className="truncate">
-                          Tipografía activa:{' '}
-                          <strong>{eventoInicial.fuente_personalizada_nombre || 'Fuente personalizada cargada'}</strong>
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEliminarFuenteCustom(true)
-                          if (inputFuenteRef.current) {
-                            inputFuenteRef.current.value = ''
-                          }
-                        }}
-                        className="shrink-0 px-2.5 py-1 bg-white hover:bg-rose-50 text-rose-600 hover:text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-xs"
-                        title="Eliminar tipografía personalizada y volver a la estándar"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                        <span>Eliminar</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {eliminarFuenteCustom && (
-                    <div className="flex items-center justify-between gap-2 text-[11px] text-rose-700 bg-rose-50 px-3 py-1.5 rounded-xl border border-rose-200/60 font-medium">
-                      <span className="truncate">
-                        🗑️ Tipografía personalizada marcada para eliminar (se usará la oficial estándar).
+                  {fuenteSeleccionada.startsWith('custom:') && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200 font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>
+                        Tipografía activa del catálogo:{' '}
+                        <strong>
+                          {fuentesDisponibles.find((f) => f.id === fuenteSeleccionada.replace('custom:', ''))?.nombre || 'Fuente seleccionada'}
+                        </strong>
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setEliminarFuenteCustom(false)}
-                        className="shrink-0 text-[10px] text-slate-500 hover:text-slate-800 underline font-semibold cursor-pointer"
-                      >
-                        Deshacer
-                      </button>
                     </div>
                   )}
                 </div>

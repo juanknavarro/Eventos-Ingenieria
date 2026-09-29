@@ -25,16 +25,20 @@ export default async function NuevoEventoPage({ searchParams }: Props) {
 
   const { id } = await searchParams
 
-  const [eventoInicial, programas] = await Promise.all([
+  const [eventoInicial, programas, fuentesCatalogo] = await Promise.all([
     id
       ? prisma.evento.findUnique({
           where: { id },
-          include: { organizador: true },
+          include: { organizador: true, fuenteCatalogo: true },
         })
       : Promise.resolve(null),
     prisma.programa.findMany({
       where: { estado_activo: true },
       select: { id: true, nombre: true },
+      orderBy: { nombre: 'asc' },
+    }),
+    prisma.catalogoFuente.findMany({
+      select: { id: true, nombre: true, familia: true, url: true, formato: true },
       orderBy: { nombre: 'asc' },
     }),
   ])
@@ -133,6 +137,7 @@ export default async function NuevoEventoPage({ searchParams }: Props) {
           programaUsuario={session.carrera}
           esSuperAdmin={esSuperAdmin(session)}
           programas={programas}
+          fuentesCatalogo={fuentesCatalogo}
         />
       </main>
     </div>

@@ -88,3 +88,35 @@ export async function subirArchivoRecursosEventos(
   }
 }
 
+/**
+ * Elimina un archivo físico alojado en Supabase Storage o en public/uploads/
+ */
+export async function eliminarArchivoRecursos(url?: string | null): Promise<boolean> {
+  if (!url || typeof url !== 'string') return false
+  try {
+    // 1. Si es local (/uploads/nombreArchivo)
+    if (url.startsWith('/uploads/')) {
+      const nombreArchivo = url.replace('/uploads/', '')
+      const rutaLocal = path.join(process.cwd(), 'public', 'uploads', nombreArchivo)
+      if (fs.existsSync(rutaLocal)) {
+        fs.unlinkSync(rutaLocal)
+        return true
+      }
+    }
+
+    // 2. Si es de Supabase Storage
+    if (url.includes(BUCKET_RECURSOS)) {
+      const partes = url.split(`${BUCKET_RECURSOS}/`)
+      if (partes.length > 1) {
+        const nombreArchivo = decodeURIComponent(partes[1].split('?')[0])
+        await supabaseStorage.storage.from(BUCKET_RECURSOS).remove([nombreArchivo])
+        return true
+      }
+    }
+  } catch (err) {
+    console.warn('Error al eliminar archivo físico de storage:', err)
+  }
+  return false
+}
+
+

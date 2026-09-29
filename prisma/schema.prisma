@@ -88,6 +88,7 @@ model Usuario {
   inscripciones              Inscripcion[] @relation("UsuarioInscrito")
   inscripcionesComoProfesor  Inscripcion[] @relation("ProfesorResponsable")
   asistenciasRegistradas     Asistencia[]  @relation("StaffRegistroAsistencia")
+  fuentesSubidas             CatalogoFuente[]
 
   @@map("usuarios")
 }
@@ -123,7 +124,9 @@ model Evento {
   cargo_firmante_2          String?  // Cargo del segundo firmante
 
   // Estilos Visuales y Tipografía del Certificado (PDF)
-  fuente_certificado          String?  @default("Montserrat")
+  fuente_certificado          String?         @default("Montserrat")
+  fuente_catalogo_id          String?
+  fuenteCatalogo              CatalogoFuente? @relation(fields: [fuente_catalogo_id], references: [id], onDelete: SetNull)
   fuente_personalizada_url    String?
   fuente_personalizada_nombre String?
   color_nombre_alumno         String?  @default("#0B305B")
@@ -271,5 +274,21 @@ model Programa {
   @@map("programas")
 }
 
+// Catálogo Global de Fuentes Tipográficas (.ttf / .otf)
+model CatalogoFuente {
+  id             String   @id @default(cuid())
+  nombre         String   // Ej. "Coneria Script", "Cinzel Decorative"
+  familia        String   @default("Sans-Serif") // "Sans-Serif" | "Serif" | "Script / Caligráfica" | "Display / Decorativa"
+  archivo_nombre String   // Nombre original del archivo, ej. "coneria_script.ttf"
+  url            String   // URL pública en Supabase Storage o /uploads/
+  formato        String   // "TTF" | "OTF"
+  peso_bytes     Int?     // Tamaño del archivo en bytes
+  subidoPorId    String?
+  subidoPor      Usuario? @relation(fields: [subidoPorId], references: [id], onDelete: SetNull)
+  eventos        Evento[]
 
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
+  @@map("catalogo_fuentes")
+}

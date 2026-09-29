@@ -15,7 +15,11 @@ export async function GET(
         where: { id: inscripcionId },
         include: {
           usuario: true,
-          evento: true,
+          evento: {
+            include: {
+              fuenteCatalogo: true,
+            },
+          },
         },
       }),
       obtenerConfiguracionPlantillas(),
@@ -54,6 +58,7 @@ export async function GET(
       colorFondoRol: ev?.color_fondo_rol_escarapela,
       colorTextoRol: ev?.color_texto_rol_escarapela,
       estiloRol: ev?.estilo_etiqueta_rol,
+      fuenteCatalogoUrl: ev?.fuenteCatalogo?.url,
       fuentePersonalizadaUrl: ev?.fuente_personalizada_url,
       fuente_personalizada_url: ev?.fuente_personalizada_url,
     })

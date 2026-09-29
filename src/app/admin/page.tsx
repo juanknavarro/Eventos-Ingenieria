@@ -1,4 +1,4 @@
-﻿import React from 'react'
+import React from 'react'
 import { redirect } from 'next/navigation'
 import prisma from '@/lib/prisma'
 import { getAuthSession } from '@/lib/auth/session'
@@ -11,6 +11,7 @@ import {
   Award,
   ExternalLink,
   Building2,
+  Type,
 } from 'lucide-react'
 
 import { obtenerConfiguracionPlantillas } from '@/lib/config/plantillas'
@@ -135,6 +136,14 @@ export default async function AdminPage() {
                 Gestionar Programas
               </Link>
             )}
+
+            <Link
+              href="/admin/recursos/tipografias"
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 hover:bg-white/20 text-white transition flex items-center gap-1.5"
+            >
+              <Type className="w-3.5 h-3.5 text-amber-300" />
+              Catálogo de Fuentes
+            </Link>
 
             <Link
               href="/profesor"

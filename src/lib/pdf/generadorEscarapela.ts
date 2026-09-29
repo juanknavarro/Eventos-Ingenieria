@@ -34,6 +34,8 @@ export interface DatosEscarapela {
   color_texto_rol_escarapela?: string | null
   estiloRol?: string | null // 'SOLIDO' | 'CONTORNO_CURVO' | 'TEXTO_LIBRE'
   estilo_etiqueta_rol?: string | null
+  fuenteCatalogoUrl?: string | null
+  fuente_catalogo_url?: string | null
   fuentePersonalizadaUrl?: string | null
   fuente_personalizada_url?: string | null
 }
@@ -212,11 +214,17 @@ export async function generarPdfEscarapela(datos: DatosEscarapela): Promise<Uint
   const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica)
   const fontMono = await pdfDoc.embedFont(StandardFonts.CourierBold)
 
-  // Cargar e incrustar fuente personalizada si fue suministrada (con fallback ininterrumpido a estándar)
-  const fontCustom = await cargarEIncrustarFuente(
-    pdfDoc,
-    datos.fuentePersonalizadaUrl || datos.fuente_personalizada_url
-  )
+  // Jerarquía de resolución tipográfica:
+  // 1. URL proveniente del catálogo global (evento.fuenteCatalogo?.url o cliente en vivo)
+  // 2. Legacy fuente_personalizada_url
+  // 3. Fallback ininterrumpido a estándar
+  const urlFuenteElegida =
+    datos.fuenteCatalogoUrl ||
+    datos.fuente_catalogo_url ||
+    datos.fuentePersonalizadaUrl ||
+    datos.fuente_personalizada_url
+
+  const fontCustom = await cargarEIncrustarFuente(pdfDoc, urlFuenteElegida)
   const fontNombre = fontCustom || fontBold
   const fontTitulo = fontCustom || fontBold
 

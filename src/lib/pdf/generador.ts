@@ -23,6 +23,7 @@ export interface DatosGeneracionCertificado {
   asistenciaId?: string | null
   // Nuevos estilos visuales y tipografía
   fuenteCertificado?: string | null
+  fuenteCatalogoUrl?: string | null
   fuentePersonalizadaUrl?: string | null
   fuente_personalizada_url?: string | null
   colorNombreAlumno?: string | null
@@ -180,11 +181,16 @@ export async function generarCertificadoPdf(
   const fontOblique = await pdfDoc.embedFont(esSerif ? StandardFonts.TimesRomanItalic : StandardFonts.HelveticaOblique)
   const fontMono = await pdfDoc.embedFont(StandardFonts.Courier)
 
-  // Cargar e incrustar fuente personalizada si fue suministrada (con fallback ininterrumpido a estándar)
-  const fontCustom = await cargarEIncrustarFuente(
-    pdfDoc,
-    datos.fuentePersonalizadaUrl || datos.fuente_personalizada_url
-  )
+  // Jerarquía de resolución tipográfica:
+  // 1. URL proveniente del catálogo global (evento.fuenteCatalogo?.url o cliente en vivo)
+  // 2. Legacy fuente_personalizada_url
+  // 3. Fallback ininterrumpido a estándar
+  const urlFuenteElegida =
+    datos.fuenteCatalogoUrl ||
+    datos.fuentePersonalizadaUrl ||
+    datos.fuente_personalizada_url
+
+  const fontCustom = await cargarEIncrustarFuente(pdfDoc, urlFuenteElegida)
   const fontNombre = fontCustom || fontBold
   const fontTitulo = fontCustom || fontBold
 

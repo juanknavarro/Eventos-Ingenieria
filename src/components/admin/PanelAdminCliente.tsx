@@ -36,6 +36,7 @@ import {
   Phone,
   Award,
   QrCode,
+  Type,
 } from 'lucide-react'
 import { RolUsuario, EstadoEvento } from '@prisma/client'
 import {
@@ -503,8 +504,16 @@ export default function PanelAdminCliente({
         )}
 
         <Link
-          href="/admin/asignaturas"
+          href="/admin/recursos/tipografias"
           className="px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer text-slate-700 bg-white hover:text-[#0B305B] hover:shadow-xs border border-slate-200/80 sm:ml-auto"
+        >
+          <Type className="w-4 h-4 text-[#0B305B]" />
+          Catálogo de Fuentes
+        </Link>
+
+        <Link
+          href="/admin/asignaturas"
+          className="px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer text-slate-700 bg-white hover:text-[#0B305B] hover:shadow-xs border border-slate-200/80"
         >
           <BookOpen className="w-4 h-4 text-[#0B305B]" />
           Catálogo Asignaturas

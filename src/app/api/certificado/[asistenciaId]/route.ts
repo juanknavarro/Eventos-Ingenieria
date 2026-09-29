@@ -20,6 +20,7 @@ export async function GET(
               evento: {
                 include: {
                   organizador: true,
+                  fuenteCatalogo: true,
                 },
               },
             },
@@ -62,6 +63,7 @@ export async function GET(
       nombreFirmante2: ev.nombre_firmante_2,
       cargoFirmante2: ev.cargo_firmante_2,
       fuenteCertificado: ev.fuente_certificado,
+      fuenteCatalogoUrl: ev.fuenteCatalogo?.url,
       fuentePersonalizadaUrl: ev.fuente_personalizada_url,
       fuente_personalizada_url: ev.fuente_personalizada_url,
       colorNombreAlumno: ev.color_nombre_alumno,
