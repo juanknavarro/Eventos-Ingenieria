@@ -44,6 +44,37 @@ export async function GET(
     const { usuario, evento } = inscripcion
     const ev = evento as any
 
+    // Guarda 1: Solvencia Financiera
+    const estaSolvente =
+      evento.precio === 0 ||
+      inscripcion.estado_pago === 'PAGADO' ||
+      inscripcion.estado_pago === 'EXENTO'
+
+    if (!estaSolvente) {
+      return NextResponse.json(
+        {
+          error:
+            'Acceso denegado: El pago de la inscripción se encuentra pendiente o no ha sido validado por el docente encargado.',
+        },
+        { status: 403 }
+      )
+    }
+
+    // Guarda 2: Condición Temporal Post-Evento
+    const ahora = new Date()
+    const esEventoFinalizado =
+      evento.estado === 'FINALIZADO' || (evento.fechaFin && new Date(evento.fechaFin) <= ahora)
+
+    if (!esEventoFinalizado) {
+      return NextResponse.json(
+        {
+          error:
+            'Acceso no disponible: El evento aún no ha finalizado. El certificado oficial se emitirá al término de la jornada académica.',
+        },
+        { status: 403 }
+      )
+    }
+
     const pdfBytes = await generarCertificadoPdf({
       asistenciaId: asistencia.id,
       alumnoNombre: usuario.nombre,

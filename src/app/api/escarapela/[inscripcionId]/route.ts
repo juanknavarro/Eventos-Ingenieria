@@ -32,6 +32,21 @@ export async function GET(
       )
     }
 
+    // Guarda de seguridad: Si el evento es de pago, la escarapela requiere estado PAGADO o EXENTO
+    const requierePago = inscripcion.evento.precio > 0
+    const estaSolvente =
+      inscripcion.estado_pago === 'PAGADO' || inscripcion.estado_pago === 'EXENTO'
+
+    if (requierePago && !estaSolvente) {
+      return NextResponse.json(
+        {
+          error:
+            'Acceso denegado: La escarapela se encuentra bloqueada hasta que el docente o administrador valide y registre el pago de la inscripción.',
+        },
+        { status: 403 }
+      )
+    }
+
     const ev = inscripcion.evento as any
 
     const pdfBytes = await generarPdfEscarapela({

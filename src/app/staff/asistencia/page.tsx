@@ -26,11 +26,28 @@ export default async function ControlAsistenciaStaffPage() {
     redirect('/login?error=acceso_denegado_staff')
   }
 
-  const filtroEventos = filtroEventosPorTenancy(sesion)
+  // Defensa en Profundidad: Verificar vigencia del Staff activo
+  let eventoAsignadoStaffId: string | null = null
+  if (sesion.rol === RolUsuario.STAFF) {
+    const usuarioStaff = await prisma.usuario.findUnique({
+      where: { id: sesion.id },
+      include: { eventoAsignado: true },
+    })
 
-  // Consultar eventos activos filtrados por programa
+    if (!usuarioStaff?.eventoAsignado || new Date(usuarioStaff.eventoAsignado.fechaFin) < new Date()) {
+      redirect('/login?error=staff_expirado')
+    }
+    eventoAsignadoStaffId = usuarioStaff.eventoAsignadoId
+  }
+
+  const filtroEventos = filtroEventosPorTenancy(sesion)
+  const filtroFinal = sesion.rol === RolUsuario.STAFF && eventoAsignadoStaffId
+    ? { id: eventoAsignadoStaffId }
+    : filtroEventos
+
+  // Consultar eventos activos filtrados por programa o asignación
   const eventos = await prisma.evento.findMany({
-    where: filtroEventos,
+    where: filtroFinal,
     select: {
       id: true,
       titulo: true,

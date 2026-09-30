@@ -85,6 +85,8 @@ model Usuario {
 
   // Relaciones
   eventosOrganizados         Evento[]      @relation("OrganizadorEvento")
+  eventoAsignadoId           String?
+  eventoAsignado             Evento?       @relation(fields: [eventoAsignadoId], references: [id])
   inscripciones              Inscripcion[] @relation("UsuarioInscrito")
   inscripcionesComoProfesor  Inscripcion[] @relation("ProfesorResponsable")
   asistenciasRegistradas     Asistencia[]  @relation("StaffRegistroAsistencia")
@@ -152,8 +154,9 @@ model Evento {
   updatedAt            DateTime     @updatedAt
 
   // Relaciones
-  organizador   Usuario       @relation("OrganizadorEvento", fields: [organizadorId], references: [id], onDelete: Restrict)
-  inscripciones Inscripcion[]
+  organizador    Usuario       @relation("OrganizadorEvento", fields: [organizadorId], references: [id], onDelete: Restrict)
+  staffAsignados Usuario[]
+  inscripciones  Inscripcion[]
 
   @@map("eventos")
 }

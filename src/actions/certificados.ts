@@ -21,6 +21,7 @@ export interface EventoAsistidoItem {
   cargoFirmante1?: string | null
   firmaOrganizadorUrl?: string | null
   firmaDirectorUrl?: string | null
+  eventoPrecio?: number
   nombreFirmante2?: string | null
   cargoFirmante2?: string | null
 }
@@ -30,9 +31,10 @@ export interface EventoPendienteItem {
   eventoId: string
   eventoTitulo: string
   eventoFecha: Date
+  eventoPrecio: number
   estadoPago: string
   escarapelaPlantillaUrl?: string | null
-  motivo: 'PAGO_PENDIENTE' | 'SIN_ASISTENCIA' | 'PAGO_RECHAZADO'
+  motivo: 'PAGO_PENDIENTE' | 'SIN_ASISTENCIA' | 'PAGO_RECHAZADO' | 'EVENTO_EN_CURSO'
 }
 
 export interface ConsultaEstudianteResultado {
@@ -108,9 +110,19 @@ export async function consultarCertificadosEstudiante(
     const eventosAsistidos: EventoAsistidoItem[] = []
     const eventosPendientes: EventoPendienteItem[] = []
 
+    const ahora = new Date()
+
     for (const ins of usuario.inscripciones) {
       const ev = ins.evento as any
-      if (ins.asistencia) {
+      const tieneAsistencia = !!ins.asistencia
+      const esEventoFinalizado = ev.estado === 'FINALIZADO' || (ev.fechaFin && new Date(ev.fechaFin) <= ahora)
+      const estaSolvente = ev.precio === 0 || ins.estado_pago === 'PAGADO' || ins.estado_pago === 'EXENTO'
+
+      // Triple condición para liberar Diploma Oficial:
+      // 1. Asistencia física real en BD
+      // 2. Evento Finalizado (post-evento)
+      // 3. Solvencia Financiera (Gratis, Pagado o Exento)
+      if (ins.asistencia && esEventoFinalizado && estaSolvente) {
         eventosAsistidos.push({
           inscripcionId: ins.id,
           asistenciaId: ins.asistencia.id,
@@ -118,6 +130,7 @@ export async function consultarCertificadosEstudiante(
           eventoTitulo: ins.evento.titulo,
           eventoFecha: ins.evento.fechaInicio,
           eventoUbicacion: ins.evento.ubicacion,
+          eventoPrecio: ins.evento.precio,
           asignaturaBonificacion: ins.asignatura_bonificacion,
           horaAsistencia: ins.asistencia.fechaHoraRegistro,
           estadoPago: ins.estado_pago,
@@ -132,15 +145,23 @@ export async function consultarCertificadosEstudiante(
           cargoFirmante2: ev?.cargo_firmante_2 || null,
         })
       } else {
-        let motivo: 'PAGO_PENDIENTE' | 'SIN_ASISTENCIA' | 'PAGO_RECHAZADO' = 'SIN_ASISTENCIA'
-        if (ins.estado_pago === 'PENDIENTE') motivo = 'PAGO_PENDIENTE'
-        if (ins.estado_pago === 'RECHAZADO') motivo = 'PAGO_RECHAZADO'
+        let motivo: 'PAGO_PENDIENTE' | 'SIN_ASISTENCIA' | 'PAGO_RECHAZADO' | 'EVENTO_EN_CURSO' = 'SIN_ASISTENCIA'
+        if (ins.estado_pago === 'RECHAZADO') {
+          motivo = 'PAGO_RECHAZADO'
+        } else if (!estaSolvente) {
+          motivo = 'PAGO_PENDIENTE'
+        } else if (tieneAsistencia && !esEventoFinalizado) {
+          motivo = 'EVENTO_EN_CURSO'
+        } else {
+          motivo = 'SIN_ASISTENCIA'
+        }
 
         eventosPendientes.push({
           inscripcionId: ins.id,
           eventoId: ins.evento.id,
           eventoTitulo: ins.evento.titulo,
           eventoFecha: ins.evento.fechaInicio,
+          eventoPrecio: ins.evento.precio,
           estadoPago: ins.estado_pago,
           escarapelaPlantillaUrl: ev?.escarapela_plantilla_url || null,
           motivo,

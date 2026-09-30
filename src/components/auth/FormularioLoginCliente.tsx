@@ -40,6 +40,9 @@ export default function FormularioLoginCliente() {
     if (errorParam === 'acceso_denegado_staff') {
       return 'Acceso Denegado: La sección /staff es exclusiva para personal con rol STAFF o ADMIN. Tu rol actual no tiene permisos.'
     }
+    if (errorParam === 'staff_expirado') {
+      return 'Acceso inhabilitado: Tu credencial de Staff ha expirado tras finalizar el evento. ¡Gracias por tu colaboración!'
+    }
     return null
   }
 

@@ -82,6 +82,12 @@ interface UsuarioData {
   carrera: string | null
   semestre: string | null
   createdAt: Date | string
+  eventoAsignadoId?: string | null
+  eventoAsignado?: {
+    id: string
+    titulo: string
+    fechaFin: Date | string
+  } | null
 }
 
 export interface ProgramaItemSimple {
@@ -136,6 +142,7 @@ export default function PanelAdminCliente({
 
   // Estado de Modal de Registro de Personal (Profesor / Staff)
   const [modalPersonalAbierto, setModalPersonalAbierto] = useState(false)
+  const [rolNuevoPersonal, setRolNuevoPersonal] = useState<RolUsuario>('PROFESOR')
 
   // Estados para Edición y Eliminación de Usuarios
   const [usuarioEnEdicion, setUsuarioEnEdicion] = useState<UsuarioData | null>(null)
@@ -747,6 +754,29 @@ export default function PanelAdminCliente({
                             {u.rol === 'ALUMNO' && <User className="w-3 h-3" />}
                             {u.rol === 'SUPER_ADMIN' ? 'SUPER ADMIN' : u.rol === 'ADMIN' ? 'JEFE PROGRAMA' : u.rol}
                           </span>
+                          {u.rol === 'STAFF' && (
+                            <div className="mt-1">
+                              {u.eventoAsignado ? (
+                                <span
+                                  className={`inline-block text-[9px] px-1.5 py-0.5 rounded font-medium ${
+                                    new Date(u.eventoAsignado.fechaFin) < new Date()
+                                      ? 'bg-rose-100 text-rose-700 border border-rose-200'
+                                      : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                  }`}
+                                  title={`Evento: ${u.eventoAsignado.titulo} (Fin: ${new Date(u.eventoAsignado.fechaFin).toLocaleDateString('es-CO')})`}
+                                >
+                                  {new Date(u.eventoAsignado.fechaFin) < new Date() ? 'Expirado: ' : 'Vigente: '}
+                                  {u.eventoAsignado.titulo.length > 18
+                                    ? u.eventoAsignado.titulo.substring(0, 16) + '...'
+                                    : u.eventoAsignado.titulo}
+                                </span>
+                              ) : (
+                                <span className="inline-block text-[9px] px-1.5 py-0.5 rounded font-medium bg-amber-100 text-amber-800 border border-amber-200">
+                                  Sin evento
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-center">
                           {u.rol === 'SUPER_ADMIN' || u.email === 'juannavarro@unisinu.edu.co' ? (
@@ -1497,7 +1527,8 @@ export default function PanelAdminCliente({
                   <select
                     name="rol"
                     required
-                    defaultValue="PROFESOR"
+                    value={rolNuevoPersonal}
+                    onChange={(e) => setRolNuevoPersonal(e.target.value as RolUsuario)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none font-bold text-slate-800"
                   >
                     <option value="PROFESOR">PROFESOR (Aprobar pagos en efectivo)</option>
@@ -1543,6 +1574,46 @@ export default function PanelAdminCliente({
                   )}
                 </div>
               </div>
+
+              {/* Selector condicional de Evento para usuarios con rol STAFF */}
+              {rolNuevoPersonal === 'STAFF' && (
+                <div className="space-y-1.5 p-3.5 bg-amber-50/80 border border-amber-300 rounded-2xl animate-in fade-in">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-amber-950 flex items-center gap-1.5 text-xs">
+                      <Briefcase className="w-3.5 h-3.5 text-amber-700" />
+                      Evento Asignado para Staff *
+                    </label>
+                    <span className="text-[10px] text-amber-800 font-semibold bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                      Obligatorio
+                    </span>
+                  </div>
+                  <select
+                    name="evento_asignado_id"
+                    required
+                    defaultValue=""
+                    className="w-full px-3 py-2 bg-white border border-amber-300 focus:border-[#0B305B] rounded-xl outline-none font-bold text-slate-800 cursor-pointer text-xs shadow-xs"
+                  >
+                    <option value="" disabled>
+                      -- Selecciona el evento donde apoyará el Staff --
+                    </option>
+                    {eventos
+                      .filter((ev) => {
+                        if (!esSuperAdmin && adminActual.carrera && ev.programa_academico) {
+                          return ev.programa_academico === adminActual.carrera
+                        }
+                        return true
+                      })
+                      .map((ev) => (
+                        <option key={ev.id} value={ev.id}>
+                          {ev.titulo} ({new Date(ev.fechaInicio).toLocaleDateString('es-CO')} - {ev.estado})
+                        </option>
+                      ))}
+                  </select>
+                  <p className="text-[11px] text-amber-900 leading-tight">
+                    <strong>Caducidad de Seguridad:</strong> El acceso del usuario Staff se inhabilitará automáticamente tan pronto finalice la fecha del evento asignado.
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
@@ -1679,6 +1750,42 @@ export default function PanelAdminCliente({
                   />
                 )}
               </div>
+
+              {usuarioEnEdicion.rol === 'STAFF' && (
+                <div className="space-y-1.5 p-3.5 bg-amber-50/80 border border-amber-300 rounded-2xl animate-in fade-in">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-amber-950 flex items-center gap-1.5 text-xs">
+                      <Briefcase className="w-3.5 h-3.5 text-amber-700" />
+                      Evento Asignado para Staff
+                    </label>
+                    <span className="text-[10px] text-amber-800 font-semibold bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                      Vigencia
+                    </span>
+                  </div>
+                  <select
+                    name="evento_asignado_id"
+                    defaultValue={usuarioEnEdicion.eventoAsignadoId || usuarioEnEdicion.eventoAsignado?.id || ''}
+                    className="w-full px-3 py-2 bg-white border border-amber-300 focus:border-[#0B305B] rounded-xl outline-none font-bold text-slate-800 cursor-pointer text-xs shadow-xs"
+                  >
+                    <option value="">-- Sin evento asignado (Inhabilitado) --</option>
+                    {eventos
+                      .filter((ev) => {
+                        if (!esSuperAdmin && adminActual.carrera && ev.programa_academico) {
+                          return ev.programa_academico === adminActual.carrera
+                        }
+                        return true
+                      })
+                      .map((ev) => (
+                        <option key={ev.id} value={ev.id}>
+                          {ev.titulo} ({new Date(ev.fechaInicio).toLocaleDateString('es-CO')} - {ev.estado})
+                        </option>
+                      ))}
+                  </select>
+                  <p className="text-[11px] text-amber-900 leading-tight">
+                    Puedes renovar o modificar el evento asignado para extender la vigencia del usuario Staff.
+                  </p>
+                </div>
+              )}
 
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between text-[11px]">
                 <span className="text-slate-500">Rol asignado en el sistema:</span>

@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
-import Link from 'next/link'
 import * as XLSX from 'xlsx'
 import {
   BarChart,
@@ -15,6 +14,14 @@ import {
   Pie,
   Cell,
   Legend,
+  FunnelChart,
+  Funnel,
+  LabelList,
+  AreaChart,
+  Area,
+  RadialBarChart,
+  RadialBar,
+  PolarAngleAxis,
 } from 'recharts'
 import {
   DollarSign,
@@ -23,17 +30,17 @@ import {
   TrendingUp,
   FileSpreadsheet,
   FileText,
-  Calendar,
   Filter,
-  ArrowLeft,
   GraduationCap,
-  Award,
-  Sparkles,
   PieChart as PieIcon,
   BarChart3,
-  Clock,
-  MapPin,
   ExternalLink,
+  BookOpen,
+  Gauge,
+  Activity,
+  UserCheck,
+  Flame,
+  ArrowRight,
 } from 'lucide-react'
 
 export interface EventoOpcion {
@@ -43,6 +50,8 @@ export interface EventoOpcion {
   ubicacion: string
   precio: number
   estado: string
+  capacidadMaxima?: number | null
+  programa_academico?: string | null
 }
 
 export interface InscripcionReporte {
@@ -132,7 +141,7 @@ export default function DashboardReportesCliente({
     )
   }, [eventos, inscripciones, programaFiltro])
 
-  // Cálculo dinámico de KPIs
+  // Cálculo dinámico de KPIs principales
   const kpis = useMemo(() => {
     const totalInscritos = inscripcionesFiltradas.length
     const totalRecaudado = inscripcionesFiltradas.reduce(
@@ -146,7 +155,6 @@ export default function DashboardReportesCliente({
     const asistentesReales = inscripcionesFiltradas.filter((i) => i.asistencia !== null).length
     const tasaAsistencia = totalInscritos > 0 ? (asistentesReales / totalInscritos) * 100 : 0
 
-    // Dinero estimado pendiente de cobro
     const montoPendiente = inscripcionesFiltradas.reduce((acc, curr) => {
       if (curr.estadoPago === 'PENDIENTE') {
         return acc + curr.eventoPrecio
@@ -165,6 +173,140 @@ export default function DashboardReportesCliente({
       montoPendiente,
     }
   }, [inscripcionesFiltradas])
+
+  // 1. Gráfica de Embudo de Conversión (Funnel)
+  const datosEmbudo = useMemo(() => {
+    const total = kpis.totalInscritos
+    const confirmados = kpis.pagadosCount + kpis.exentosCount
+    const asistentes = kpis.asistentesReales
+
+    const pctConfirmados = total > 0 ? Math.round((confirmados / total) * 100) : 0
+    const pctAsistentes = total > 0 ? Math.round((asistentes / total) * 100) : 0
+    const pctConversionAsistencia = confirmados > 0 ? Math.round((asistentes / confirmados) * 100) : 0
+
+    return {
+      chartData: [
+        {
+          name: 'Preinscritos',
+          value: total,
+          fill: '#0B305B',
+          formattedValue: `${total} alumnos`,
+        },
+        {
+          name: 'Pagados / Confirmados',
+          value: confirmados,
+          fill: '#2563EB',
+          formattedValue: `${confirmados} (${pctConfirmados}%)`,
+        },
+        {
+          name: 'Check-in en Puerta',
+          value: asistentes,
+          fill: '#D2202E',
+          formattedValue: `${asistentes} (${pctAsistentes}%)`,
+        },
+      ],
+      total,
+      confirmados,
+      asistentes,
+      pctConfirmados,
+      pctAsistentes,
+      pctConversionAsistencia,
+    }
+  }, [kpis])
+
+  // 2. Gráfica de Área: Picos de Asistencia por Franjas Horarias (Time Series)
+  const { datosHorariosCheckin, picoMaximo } = useMemo(() => {
+    const asistenciasValidadas = inscripcionesFiltradas
+      .map((i) => i.asistencia)
+      .filter((a): a is NonNullable<typeof a> => a !== null && !!a.fechaHoraRegistro)
+
+    const horasMap = new Map<string, number>()
+    // Rango habitual para eventos universitarios: 07:00 a 19:00
+    for (let h = 7; h <= 19; h++) {
+      const horaStr = `${h.toString().padStart(2, '0')}:00`
+      horasMap.set(horaStr, 0)
+    }
+
+    for (const a of asistenciasValidadas) {
+      const fecha = new Date(a.fechaHoraRegistro)
+      const h = fecha.getHours()
+      const horaStr = `${h.toString().padStart(2, '0')}:00`
+      horasMap.set(horaStr, (horasMap.get(horaStr) || 0) + 1)
+    }
+
+    const items = Array.from(horasMap.entries()).map(([hora, checkins]) => ({
+      hora,
+      checkins,
+    }))
+
+    let max = { hora: '08:00', checkins: 0 }
+    for (const item of items) {
+      if (item.checkins > max.checkins) {
+        max = item
+      }
+    }
+
+    return { datosHorariosCheckin: items, picoMaximo: max }
+  }, [inscripcionesFiltradas])
+
+  // 3. Gráfica de Barras Horizontales: Top de Asignaturas con Bonificación Académica
+  const datosTopAsignaturas = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const ins of inscripcionesFiltradas) {
+      const nombre = ins.asignaturaBonificacion?.trim()
+      if (
+        nombre &&
+        nombre.toLowerCase() !== 'no aplica' &&
+        nombre.toLowerCase() !== 'ninguna' &&
+        nombre.toLowerCase() !== 'sin asignatura'
+      ) {
+        map.set(nombre, (map.get(nombre) || 0) + 1)
+      }
+    }
+
+    return Array.from(map.entries())
+      .map(([asignatura, cantidad]) => ({
+        asignatura: asignatura.length > 20 ? `${asignatura.substring(0, 18)}...` : asignatura,
+        nombreCompleto: asignatura,
+        cantidad,
+        porcentaje: kpis.totalInscritos > 0 ? Math.round((cantidad / kpis.totalInscritos) * 100) : 0,
+      }))
+      .sort((a, b) => b.cantidad - a.cantidad)
+      .slice(0, 6)
+  }, [inscripcionesFiltradas, kpis.totalInscritos])
+
+  // 4. Termómetro y Medidor Radial: Aforo y Capacidad del Recinto
+  const datosAforo = useMemo(() => {
+    let capacidad = 0
+    if (eventoFiltro !== 'todos') {
+      const ev = eventos.find((e) => e.id === eventoFiltro)
+      capacidad = ev?.capacidadMaxima || 0
+    } else {
+      capacidad = eventosDisponibles.reduce((acc, curr) => acc + (curr.capacidadMaxima || 0), 0)
+    }
+
+    const ocupados = kpis.asistentesReales
+    const porcentaje = capacidad > 0 ? Math.min(100, Math.round((ocupados / capacidad) * 100)) : 0
+    const disponibles = Math.max(0, capacidad - ocupados)
+
+    const color =
+      porcentaje >= 90 ? '#D2202E' : porcentaje >= 75 ? '#F59E0B' : '#10B981'
+
+    return {
+      capacidad,
+      ocupados,
+      porcentaje,
+      disponibles,
+      color,
+      radialData: [
+        {
+          name: 'Ocupación',
+          value: porcentaje,
+          fill: color,
+        },
+      ],
+    }
+  }, [eventoFiltro, eventos, eventosDisponibles, kpis.asistentesReales])
 
   // Datos para Gráfico de Barras: Recaudo por cada Profesor
   const datosRecaudoPorProfesor = useMemo(() => {
@@ -198,8 +340,7 @@ export default function DashboardReportesCliente({
     }))
   }, [inscripcionesFiltradas])
 
-  // 2) Exportar archivo estructurado Excel con tres hojas:
-  // 'Resumen Financiero', 'Listado General' y 'Auditoría de Asistencia'
+  // Exportar archivo estructurado Excel con tres hojas
   const handleExportarExcel = () => {
     const wb = XLSX.utils.book_new()
 
@@ -224,6 +365,8 @@ export default function DashboardReportesCliente({
       ['Inscripciones Exentas / Becadas', kpis.exentosCount],
       ['Asistentes Reales en Puerta (Check-in)', kpis.asistentesReales],
       ['Tasa de Efectividad de Asistencia', `${kpis.tasaAsistencia.toFixed(1)}%`],
+      ['Capacidad Máxima Registrada', datosAforo.capacidad > 0 ? `${datosAforo.capacidad} cupos` : 'No definida'],
+      ['Porcentaje de Aforo Cubierto', `${datosAforo.porcentaje}%`],
       [],
       ['DESGLOSE DE RECAUDO POR DOCENTE RESPONSABLE'],
       ['Docente / Profesor', 'Alumnos Asignados', 'Total Recaudado (COP)'],
@@ -295,7 +438,6 @@ export default function DashboardReportesCliente({
     const ws3 = XLSX.utils.aoa_to_sheet(hoja3Datos)
     XLSX.utils.book_append_sheet(wb, ws3, 'Auditoría de Asistencia')
 
-    // Descargar libro Excel
     const nombreArchivo = `Reporte_Auditoria_Unisinu_${Date.now()}.xlsx`
     XLSX.writeFile(wb, nombreArchivo)
   }
@@ -354,9 +496,8 @@ export default function DashboardReportesCliente({
           </div>
         </div>
 
-        {/* 2 y 3) Botones de Exportación: Excel y PDF */}
+        {/* Botones de Exportación: Excel y PDF */}
         <div className="flex items-center gap-2.5 w-full sm:w-auto self-end lg:self-auto flex-wrap">
-          {/* Botón Exportar Excel */}
           <button
             type="button"
             onClick={handleExportarExcel}
@@ -366,7 +507,6 @@ export default function DashboardReportesCliente({
             Exportar Excel (.xlsx)
           </button>
 
-          {/* Botón Generar Informe PDF */}
           <a
             href={`/api/reportes/pdf?eventoId=${eventoFiltro}`}
             target="_blank"
@@ -381,7 +521,7 @@ export default function DashboardReportesCliente({
       </div>
 
       {/* ========================================================================= */}
-      {/* 1) TARJETAS DE KPIS PRINCIPALES */}
+      {/* TARJETAS DE KPIS PRINCIPALES */}
       {/* ========================================================================= */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {/* KPI 1: Total Recaudado */}
@@ -473,16 +613,354 @@ export default function DashboardReportesCliente({
       </div>
 
       {/* ========================================================================= */}
-      {/* 1) GRÁFICOS INTERACTIVOS (BARRAS Y CIRCULAR) */}
+      {/* BENTO-BOX GRID: DASHBOARD ANALÍTICO EJECUTIVO */}
       {/* ========================================================================= */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Gráfico 1: Barras — Dinero Recaudado por Cada Profesor (7 Columnas en LG) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
+        {/* ======================================================================= */}
+        {/* CAJA 1: EMBUDO DE CONVERSIÓN OPERATIVA (FUNNEL CHART) */}
+        {/* ======================================================================= */}
+        <div className="lg:col-span-6 bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-5">
+          <div className="border-b border-slate-100 pb-3 flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-[#0B305B] flex items-center gap-2">
+                <Filter className="w-4 h-4 text-[#D2202E]" />
+                Embudo de Conversión Operativa
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Seguimiento de etapas: Preinscritos ➔ Pagos Validados ➔ Asistencia en Puerta
+              </p>
+            </div>
+            <span className="text-[11px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl whitespace-nowrap">
+              {datosEmbudo.pctAsistentes}% Conversión Global
+            </span>
+          </div>
+
+          <div className="h-64 w-full flex items-center justify-center">
+            {mounted && datosEmbudo.total > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <FunnelChart>
+                  <Tooltip
+                    formatter={(val: any, name: any) => [`${val} estudiantes`, name]}
+                    contentStyle={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '12px',
+                      border: '1px solid #E2E8F0',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                      fontSize: '11px',
+                    }}
+                  />
+                  <Funnel
+                    dataKey="value"
+                    data={datosEmbudo.chartData}
+                    isAnimationActive
+                  >
+                    <LabelList
+                      position="right"
+                      fill="#0B305B"
+                      stroke="none"
+                      dataKey="formattedValue"
+                      style={{ fontSize: '11px', fontWeight: 'bold' }}
+                    />
+                  </Funnel>
+                </FunnelChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="text-xs text-slate-400">No hay inscripciones para trazar el embudo.</div>
+            )}
+          </div>
+
+          {/* Tarjetas resumen de fases del embudo con tasa de fuga */}
+          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center">
+            <div className="p-2.5 bg-slate-50 rounded-2xl border border-slate-200/60">
+              <span className="text-[10px] text-slate-500 font-bold uppercase block">Preinscritos</span>
+              <span className="text-base font-black text-[#0B305B]">{datosEmbudo.total}</span>
+              <span className="text-[9px] text-slate-400 block font-semibold">100% Base</span>
+            </div>
+            <div className="p-2.5 bg-blue-50/60 rounded-2xl border border-blue-200/60">
+              <span className="text-[10px] text-blue-700 font-bold uppercase block">Confirmados</span>
+              <span className="text-base font-black text-blue-900">{datosEmbudo.confirmados}</span>
+              <span className="text-[9px] text-blue-600 block font-semibold">{datosEmbudo.pctConfirmados}% del total</span>
+            </div>
+            <div className="p-2.5 bg-rose-50/60 rounded-2xl border border-rose-200/60">
+              <span className="text-[10px] text-rose-700 font-bold uppercase block">Asistieron</span>
+              <span className="text-base font-black text-[#D2202E]">{datosEmbudo.asistentes}</span>
+              <span className="text-[9px] text-rose-600 block font-semibold">{datosEmbudo.pctConversionAsistencia}% de los pagados</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ======================================================================= */}
+        {/* CAJA 2: ÁREA DE HORARIOS DE CHECK-IN (PICOS DE AFLUENCIA) */}
+        {/* ======================================================================= */}
+        <div className="lg:col-span-6 bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-5">
+          <div className="border-b border-slate-100 pb-3 flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-[#0B305B] flex items-center gap-2">
+                <Activity className="w-4 h-4 text-[#D2202E]" />
+                Curva de Afluencia y Horarios de Check-in
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Distribución temporal de validación de credenciales QR en accesos
+              </p>
+            </div>
+            {picoMaximo.checkins > 0 && (
+              <span className="text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl flex items-center gap-1.5 whitespace-nowrap">
+                <Flame className="w-3.5 h-3.5 text-amber-600" />
+                Pico: {picoMaximo.hora} ({picoMaximo.checkins} check-ins)
+              </span>
+            )}
+          </div>
+
+          <div className="h-64 w-full pt-1">
+            {mounted && kpis.asistentesReales > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={datosHorariosCheckin}
+                  margin={{ top: 10, right: 15, left: -25, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="degradeCheckin" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#0B305B" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#0B305B" stopOpacity={0.05} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                  <XAxis
+                    dataKey="hora"
+                    tick={{ fontSize: 10, fill: '#64748B' }}
+                    interval={1}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    tick={{ fontSize: 10, fill: '#64748B' }}
+                  />
+                  <Tooltip
+                    formatter={(val: any) => [`${val} asistencias`, 'Check-ins QR']}
+                    labelStyle={{ fontWeight: 'bold', color: '#0B305B', fontSize: '11px' }}
+                    contentStyle={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '12px',
+                      border: '1px solid #E2E8F0',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                      fontSize: '11px',
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="checkins"
+                    stroke="#0B305B"
+                    strokeWidth={2.5}
+                    fillOpacity={1}
+                    fill="url(#degradeCheckin)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-xs text-slate-400">
+                Aún no hay registros de check-in en puerta para este corte de evento.
+              </div>
+            )}
+          </div>
+
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-xs text-slate-600">
+            <span className="flex items-center gap-1.5 font-medium">
+              <UserCheck className="w-4 h-4 text-emerald-600" />
+              Total Asistentes Verificados:
+            </span>
+            <span className="font-black text-[#0B305B]">{kpis.asistentesReales} escaneos oficiales</span>
+          </div>
+        </div>
+
+        {/* ======================================================================= */}
+        {/* CAJA 3: TOP DE ASIGNATURAS CON BONIFICACIÓN ACADÉMICA (BARRAS) */}
+        {/* ======================================================================= */}
+        <div className="lg:col-span-7 bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-5">
+          <div className="border-b border-slate-100 pb-3 flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-[#0B305B] flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-[#0B305B]" />
+                Top de Asignaturas con Bonificación Académica
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Cátedras universitarias con mayor atracción de incentivo académico
+              </p>
+            </div>
+            <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-xl">
+              {datosTopAsignaturas.length} Materias Líderes
+            </span>
+          </div>
+
+          <div className="h-68 w-full">
+            {mounted && datosTopAsignaturas.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={datosTopAsignaturas}
+                  layout="vertical"
+                  margin={{ top: 5, right: 25, left: 10, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
+                  <XAxis
+                    type="number"
+                    allowDecimals={false}
+                    tick={{ fontSize: 10, fill: '#64748B' }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="asignatura"
+                    width={130}
+                    tick={{ fontSize: 10, fill: '#1E293B', fontWeight: 600 }}
+                  />
+                  <Tooltip
+                    formatter={(val: any, name: any, item: any) => [
+                      `${val} estudiantes bonificados`,
+                      item?.payload?.nombreCompleto || 'Materia',
+                    ]}
+                    contentStyle={{
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '12px',
+                      border: '1px solid #E2E8F0',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                      fontSize: '11px',
+                    }}
+                  />
+                  <Bar dataKey="cantidad" radius={[0, 8, 8, 0]}>
+                    {datosTopAsignaturas.map((_, index) => (
+                      <Cell
+                        key={`bar-asig-${index}`}
+                        fill={index === 0 ? '#0B305B' : index === 1 ? '#D2202E' : index === 2 ? '#2563EB' : '#10B981'}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-xs text-slate-400">
+                No se registraron postulaciones de asignaturas para este filtro.
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100">
+            <span>Las bonificaciones son acreditadas tras validar la asistencia física.</span>
+            <span className="font-bold text-[#0B305B]">Auditoría Académica</span>
+          </div>
+        </div>
+
+        {/* ======================================================================= */}
+        {/* CAJA 4: TERMÓMETRO Y MEDIDOR RADIAL DE AFORO / CAPACIDAD */}
+        {/* ======================================================================= */}
+        <div className="lg:col-span-5 bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-5">
+          <div className="border-b border-slate-100 pb-3 flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-[#0B305B] flex items-center gap-2">
+                <Gauge className="w-4 h-4 text-[#D2202E]" />
+                Ocupación y Aforo del Recinto
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Monitoreo de aforo máximo vs. concurrencia real
+              </p>
+            </div>
+            <span
+              className={`text-[11px] font-black px-2.5 py-1 rounded-xl whitespace-nowrap ${
+                datosAforo.porcentaje >= 90
+                  ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                  : datosAforo.porcentaje >= 75
+                  ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                  : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+              }`}
+            >
+              {datosAforo.capacidad === 0
+                ? 'Aforo Ilimitado'
+                : datosAforo.porcentaje >= 100
+                ? 'Capacidad Completa'
+                : `${datosAforo.porcentaje}% Ocupado`}
+            </span>
+          </div>
+
+          {/* Gráfico Radial / Tacómetro semicircular */}
+          <div className="relative h-44 w-full flex items-center justify-center">
+            {mounted && datosAforo.capacidad > 0 ? (
+              <>
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadialBarChart
+                    cx="50%"
+                    cy="80%"
+                    innerRadius="80%"
+                    outerRadius="110%"
+                    barSize={18}
+                    data={datosAforo.radialData}
+                    startAngle={180}
+                    endAngle={0}
+                  >
+                    <PolarAngleAxis
+                      type="number"
+                      domain={[0, 100]}
+                      angleAxisId={0}
+                      tick={false}
+                    />
+                    <RadialBar
+                      background={{ fill: '#F1F5F9' }}
+                      dataKey="value"
+                      cornerRadius={10}
+                    />
+                  </RadialBarChart>
+                </ResponsiveContainer>
+                {/* Texto Central en el Medidor */}
+                <div className="absolute top-[50%] left-1/2 transform -translate-x-1/2 text-center pointer-events-none">
+                  <span className="text-3xl font-black text-slate-900 tracking-tight">
+                    {datosAforo.porcentaje}%
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-bold uppercase block -mt-1">
+                    Aforo Utilizado
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="text-center p-4">
+                <span className="text-3xl font-black text-[#0B305B]">
+                  {kpis.asistentesReales}
+                </span>
+                <span className="text-xs text-slate-500 block font-medium mt-1">
+                  Asistentes sin tope de capacidad fijado
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Barra tipo Termómetro de Ocupación */}
+          <div className="space-y-2 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-slate-700">Termómetro de Aforo:</span>
+              <span className="font-bold text-slate-900">
+                {datosAforo.ocupados} / {datosAforo.capacidad || 'Ilimitada'} personas
+              </span>
+            </div>
+            <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-200">
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{
+                  width: `${Math.min(100, datosAforo.porcentaje)}%`,
+                  backgroundColor: datosAforo.color,
+                }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[10px] font-semibold text-slate-400">
+              <span>0% Inicio</span>
+              <span>Cupos disponibles: {datosAforo.disponibles}</span>
+              <span>100% Máx</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ======================================================================= */}
+        {/* CAJA 5: DINERO RECAUDADO POR CADA PROFESOR (BARRAS) */}
+        {/* ======================================================================= */}
         <div className="lg:col-span-7 bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-sm space-y-5">
           <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-bold text-[#0B305B] flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-[#D2202E]" />
-                Dinero Recaudado por Cada Profesor
+                Dinero Recaudado por Cada Docente
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
                 Volumen financiero en efectivo gestionado por los docentes asignados
@@ -530,7 +1008,7 @@ export default function DashboardReportesCliente({
                   <Bar dataKey="recaudado" radius={[8, 8, 0, 0]}>
                     {datosRecaudoPorProfesor.map((_, index) => (
                       <Cell
-                        key={`cell-${index}`}
+                        key={`cell-prof-${index}`}
                         fill={index === 0 ? '#0B305B' : index === 1 ? '#D2202E' : '#2563EB'}
                       />
                     ))}
@@ -545,7 +1023,9 @@ export default function DashboardReportesCliente({
           </div>
         </div>
 
-        {/* Gráfico 2: Circular — Inscritos por Programa Académico (5 Columnas en LG) */}
+        {/* ======================================================================= */}
+        {/* CAJA 6: INSCRITOS POR PROGRAMA ACADÉMICO (CIRCULAR / DONUT) */}
+        {/* ======================================================================= */}
         <div className="lg:col-span-5 bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-sm space-y-5">
           <div className="border-b border-slate-100 pb-3">
             <h3 className="text-sm font-bold text-[#0B305B] flex items-center gap-2">
@@ -572,7 +1052,7 @@ export default function DashboardReportesCliente({
                   >
                     {datosInscritosPorCarrera.map((_, index) => (
                       <Cell
-                        key={`pie-cell-${index}`}
+                        key={`pie-cell-prog-${index}`}
                         fill={PALETA_COLORES[index % PALETA_COLORES.length]}
                       />
                     ))}
@@ -611,7 +1091,7 @@ export default function DashboardReportesCliente({
       </div>
 
       {/* ========================================================================= */}
-      {/* DETALLE TABULAR DE AUDITORÍA RÁPIDA */}
+      {/* DETALLE TABULAR DE AUDITORÍA RÁPIDA: RENDICIÓN DE CUENTAS */}
       {/* ========================================================================= */}
       <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
         <div className="p-5 border-b border-slate-100 flex items-center justify-between">
@@ -667,4 +1147,3 @@ export default function DashboardReportesCliente({
     </div>
   )
 }
-

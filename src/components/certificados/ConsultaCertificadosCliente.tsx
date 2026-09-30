@@ -16,6 +16,7 @@ import {
   ExternalLink,
   Loader2,
   ScanBarcode,
+  Lock,
 } from 'lucide-react'
 import {
   consultarCertificadosEstudiante,
@@ -347,54 +348,80 @@ export default function ConsultaCertificadosCliente() {
               </h4>
 
               <div className="space-y-2">
-                {resultado.eventosPendientes.map((pend) => (
-                  <div
-                    key={pend.inscripcionId}
-                    className="bg-white p-3.5 rounded-xl border border-slate-200/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
-                  >
-                    <div>
-                      <p className="font-bold text-slate-900 text-xs">{pend.eventoTitulo}</p>
-                      <p className="text-[11px] text-slate-500">
-                        Fecha: {new Date(pend.eventoFecha).toLocaleDateString('es-CO')}
-                      </p>
-                    </div>
+                {resultado.eventosPendientes.map((pend) => {
+                  const escarapelaBloqueada =
+                    pend.eventoPrecio > 0 &&
+                    pend.estadoPago !== 'PAGADO' &&
+                    pend.estadoPago !== 'EXENTO'
 
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`px-2.5 py-1 text-[10px] font-bold rounded-lg ${
-                          pend.motivo === 'PAGO_PENDIENTE'
-                            ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                            : 'bg-slate-100 text-slate-600 border border-slate-200'
-                        }`}
-                      >
-                        {pend.motivo === 'PAGO_PENDIENTE'
-                          ? '⚠ Pago Pendiente (Legalizar con Docente)'
-                          : 'Asistencia No Marcada en Puerta'}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleDescargarEscarapela(
-                            pend.inscripcionId,
-                            pend.eventoTitulo,
-                            pend.escarapelaPlantillaUrl,
-                            resultado.usuario,
-                            resultado.configuracionGlobal
-                          )
-                        }
-                        disabled={descargandoEscarapelaId === pend.inscripcionId}
-                        className="inline-flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 text-xs font-bold px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition border border-indigo-200 cursor-pointer"
-                      >
-                        {descargandoEscarapelaId === pend.inscripcionId ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  return (
+                    <div
+                      key={pend.inscripcionId}
+                      className="bg-white p-3.5 rounded-xl border border-slate-200/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                    >
+                      <div>
+                        <p className="font-bold text-slate-900 text-xs">{pend.eventoTitulo}</p>
+                        <p className="text-[11px] text-slate-500">
+                          Fecha: {new Date(pend.eventoFecha).toLocaleDateString('es-CO')}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`px-2.5 py-1 text-[10px] font-bold rounded-lg ${
+                            pend.motivo === 'PAGO_PENDIENTE'
+                              ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                              : pend.motivo === 'PAGO_RECHAZADO'
+                              ? 'bg-rose-50 text-rose-800 border border-rose-200'
+                              : pend.motivo === 'EVENTO_EN_CURSO'
+                              ? 'bg-blue-50 text-blue-800 border border-blue-200'
+                              : 'bg-slate-100 text-slate-600 border border-slate-200'
+                          }`}
+                        >
+                          {pend.motivo === 'PAGO_PENDIENTE'
+                            ? '⚠ Pago Pendiente (Legalizar con Docente)'
+                            : pend.motivo === 'PAGO_RECHAZADO'
+                            ? '❌ Inscripción Rechazada'
+                            : pend.motivo === 'EVENTO_EN_CURSO'
+                            ? '⏳ Asistencia Validada (Diploma disponible al finalizar)'
+                            : 'Asistencia No Marcada en Puerta'}
+                        </span>
+
+                        {escarapelaBloqueada ? (
+                          <div
+                            className="inline-flex items-center gap-1.5 text-[11px] text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 font-medium"
+                            title="Escarapela bloqueada hasta confirmación de pago por el docente a cargo"
+                          >
+                            <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                            <span>Escarapela bloqueada: Requiere pago</span>
+                          </div>
                         ) : (
-                          <ScanBarcode className="w-3.5 h-3.5" />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleDescargarEscarapela(
+                                pend.inscripcionId,
+                                pend.eventoTitulo,
+                                pend.escarapelaPlantillaUrl,
+                                resultado.usuario,
+                                resultado.configuracionGlobal
+                              )
+                            }
+                            disabled={descargandoEscarapelaId === pend.inscripcionId}
+                            className="inline-flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 text-xs font-bold px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition border border-indigo-200 cursor-pointer"
+                          >
+                            {descargandoEscarapelaId === pend.inscripcionId ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <ScanBarcode className="w-3.5 h-3.5" />
+                            )}
+                            <span>Ver Escarapela</span>
+                          </button>
                         )}
-                        <span>Ver Escarapela</span>
-                      </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}

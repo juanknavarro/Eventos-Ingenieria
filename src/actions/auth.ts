@@ -33,6 +33,9 @@ export async function iniciarSesionConCredenciales(
   try {
     const usuario = await prisma.usuario.findUnique({
       where: { email },
+      include: {
+        eventoAsignado: true,
+      },
     })
 
     if (!usuario) {
@@ -48,6 +51,17 @@ export async function iniciarSesionConCredenciales(
         success: false,
         error:
           'El acceso con usuario y contraseña es exclusivo para personal docente, administrativo y de apoyo. Si eres estudiante, puedes consultar tus certificados y participar en eventos directamente desde el portal público sin necesidad de iniciar sesión.',
+      }
+    }
+
+    // Nivel 1 de Defensa: Si el usuario es STAFF, validar que tenga un evento asignado y no haya expirado
+    if (usuario.rol === 'STAFF') {
+      if (!usuario.eventoAsignado || usuario.eventoAsignado.fechaFin < new Date()) {
+        return {
+          success: false,
+          error:
+            'Acceso inhabilitado: Tu credencial de Staff ha expirado tras finalizar el evento. ¡Gracias por tu colaboración!',
+        }
       }
     }
 

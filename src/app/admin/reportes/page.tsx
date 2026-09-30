@@ -62,6 +62,8 @@ export default async function ReportesPage() {
     ubicacion: e.ubicacion,
     precio: e.precio,
     estado: e.estado,
+    capacidadMaxima: e.capacidadMaxima,
+    programa_academico: e.programa_academico,
   }))
 
   const inscripcionesMapeadas = inscripciones.map((ins) => ({

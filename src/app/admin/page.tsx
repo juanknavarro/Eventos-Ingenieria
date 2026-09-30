@@ -51,6 +51,15 @@ export default async function AdminPage() {
     prisma.usuario.findMany({
       where: filtroUsuarios,
       orderBy: { nombre: 'asc' },
+      include: {
+        eventoAsignado: {
+          select: {
+            id: true,
+            titulo: true,
+            fechaFin: true,
+          },
+        },
+      },
     }),
     prisma.inscripcion.findMany({
       where: filtroInscripciones,

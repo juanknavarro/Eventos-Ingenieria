@@ -613,11 +613,37 @@ export async function registrarPersonal(formData: FormData): Promise<ActionResul
     const rol = formData.get('rol') as RolUsuario
     const password = (formData.get('password') as string)?.trim()
 
+    const eventoAsignadoId = (
+      (formData.get('eventoAsignadoId') as string) ||
+      (formData.get('evento_asignado_id') as string)
+    )?.trim() || null
+
     // Validaciones de campos obligatorios
     if (!nombre || !email || !cedula || !password) {
       return {
         success: false,
         error: 'Todos los campos obligatorios (*) deben ser completados.',
+      }
+    }
+
+    // Regla para STAFF: Vinculación forzosa con un Evento
+    if (rol === RolUsuario.STAFF) {
+      if (!eventoAsignadoId) {
+        return {
+          success: false,
+          error: 'Debes seleccionar obligatoriamente un evento para vincular al personal de Staff.',
+        }
+      }
+
+      const eventoExiste = await prisma.evento.findUnique({
+        where: { id: eventoAsignadoId },
+      })
+
+      if (!eventoExiste) {
+        return {
+          success: false,
+          error: 'El evento seleccionado no existe o no es válido.',
+        }
       }
     }
 
@@ -679,6 +705,7 @@ export async function registrarPersonal(formData: FormData): Promise<ActionResul
         carrera,
         rol,
         passwordHash,
+        eventoAsignadoId: rol === RolUsuario.STAFF ? eventoAsignadoId : null,
       },
     })
 
@@ -853,6 +880,11 @@ export async function actualizarUsuario(formData: FormData): Promise<ActionResul
       }
     }
 
+    const eventoAsignadoIdRaw =
+      formData.get('eventoAsignadoId') !== null
+        ? (formData.get('eventoAsignadoId') as string)
+        : (formData.get('evento_asignado_id') as string | null)
+
     const usuarioActualizado = await prisma.usuario.update({
       where: { id: usuarioId },
       data: {
@@ -861,6 +893,9 @@ export async function actualizarUsuario(formData: FormData): Promise<ActionResul
         cedula: cedula || null,
         codigoEstudiantil: cedula || undefined,
         carrera: carrera || null,
+        ...(eventoAsignadoIdRaw !== null && eventoAsignadoIdRaw !== undefined
+          ? { eventoAsignadoId: eventoAsignadoIdRaw.trim() || null }
+          : {}),
       },
     })
 
