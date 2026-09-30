@@ -464,7 +464,7 @@ export async function generarPdfEscarapela(datos: DatosEscarapela): Promise<Uint
 
   const qrBytes = await generarQrBytes(qrContenido)
   const qrSize = 78
-  const qrY = 56
+  const qrY = 65
   const qrX = (width - qrSize) / 2
 
   // Recuadro blanco de respaldo para asegurar escaneo 100% nítido sobre cualquier fondo
@@ -493,26 +493,16 @@ export async function generarPdfEscarapela(datos: DatosEscarapela): Promise<Uint
     }
   }
 
-  // Serial / Cédula al pie del QR
-  const serialTexto = `* ${cedulaMostrar} *`
-  const wSerial = fontMono.widthOfTextAtSize(serialTexto, 7)
-  page.drawText(serialTexto, {
-    x: (width - wSerial) / 2,
-    y: qrY - 14,
-    size: 7,
-    font: fontMono,
-    color: colorOscuro,
-  })
-
   // Pie de página de verificación
   const pieTexto = 'CONTROL DE ACCESO Y ASISTENCIA • UNISINÚ'
-  const wPie = fontRegular.widthOfTextAtSize(pieTexto, 5.5)
+  const sizePie = 8
+  const wPie = fontRegular.widthOfTextAtSize(pieTexto, sizePie)
   page.drawText(pieTexto, {
     x: (width - wPie) / 2,
-    y: 22,
-    size: 5.5,
+    y: 40,
+    size: sizePie,
     font: fontRegular,
-    color: colorGris,
+    color: rgb(0.12, 0.18, 0.28),
   })
 
   return await pdfDoc.save()
