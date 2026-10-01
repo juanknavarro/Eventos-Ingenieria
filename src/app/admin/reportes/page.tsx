@@ -39,9 +39,12 @@ export default async function ReportesPage() {
         usuario: true,
         evento: true,
         profesorResponsable: true,
-        asistencia: {
+        asistencias: {
           include: {
             registradoPor: true,
+          },
+          orderBy: {
+            fechaHoraRegistro: 'desc',
           },
         },
       },
@@ -66,35 +69,38 @@ export default async function ReportesPage() {
     programa_academico: e.programa_academico,
   }))
 
-  const inscripcionesMapeadas = inscripciones.map((ins) => ({
-    id: ins.id,
-    eventoId: ins.eventoId,
-    eventoTitulo: ins.evento.titulo,
-    eventoPrecio: ins.evento.precio,
-    usuarioId: ins.usuarioId,
-    usuarioNombre: ins.usuario.nombre,
-    usuarioEmail: ins.usuario.email,
-    usuarioCedula: ins.usuario.cedula || ins.usuario.codigoEstudiantil,
-    usuarioCarrera: ins.usuario.carrera,
-    usuarioSemestre: ins.usuario.semestre,
-    asignaturaBonificacion: ins.asignatura_bonificacion,
-    profesorNombre:
-      ins.profesorResponsable?.nombre ||
-      ins.profesor_responsable_dinero ||
-      'Sin Docente Asignado',
-    estadoPago: ins.estado_pago,
-    montoPagado: ins.montoPagado,
-    fechaInscripcion: ins.fechaInscripcion.toISOString(),
-    asistencia: ins.asistencia
-      ? {
-          id: ins.asistencia.id,
-          fechaHoraRegistro: ins.asistencia.fechaHoraRegistro.toISOString(),
-          metodo: ins.asistencia.metodo,
-          registradoPorNombre: ins.asistencia.registradoPor?.nombre || 'Staff Oficial',
-          observaciones: ins.asistencia.observaciones,
-        }
-      : null,
-  }))
+  const inscripcionesMapeadas = inscripciones.map((ins) => {
+    const ultimaAsistencia = ins.asistencias[0]
+    return {
+      id: ins.id,
+      eventoId: ins.eventoId,
+      eventoTitulo: ins.evento.titulo,
+      eventoPrecio: ins.evento.precio,
+      usuarioId: ins.usuarioId,
+      usuarioNombre: ins.usuario.nombre,
+      usuarioEmail: ins.usuario.email,
+      usuarioCedula: ins.usuario.cedula || ins.usuario.codigoEstudiantil,
+      usuarioCarrera: ins.usuario.carrera,
+      usuarioSemestre: ins.usuario.semestre,
+      asignaturaBonificacion: ins.asignatura_bonificacion,
+      profesorNombre:
+        ins.profesorResponsable?.nombre ||
+        ins.profesor_responsable_dinero ||
+        'Sin Docente Asignado',
+      estadoPago: ins.estado_pago,
+      montoPagado: ins.montoPagado,
+      fechaInscripcion: ins.fechaInscripcion.toISOString(),
+      asistencia: ultimaAsistencia
+        ? {
+            id: ultimaAsistencia.id,
+            fechaHoraRegistro: ultimaAsistencia.fechaHoraRegistro.toISOString(),
+            metodo: ultimaAsistencia.metodo,
+            registradoPorNombre: ultimaAsistencia.registradoPor?.nombre || 'Staff Oficial',
+            observaciones: ultimaAsistencia.observaciones,
+          }
+        : null,
+    }
+  })
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-16">

@@ -45,6 +45,7 @@ interface EventoInicial {
   ubicacion: string
   capacidadMaxima: number | null
   precio: number
+  asistenciasMinimas?: number | null
   estado: EstadoEvento
   imagenUrl: string | null
   logo_fondo_url: string | null
@@ -565,12 +566,12 @@ export default function FormularioEventoCliente({
               />
             </div>
 
-            {/* Precio y Capacidad */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
-                  Valor de Inscripción (COP)
+            {/* Precio, Capacidad y Asistencias Mínimas */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-start">
+              <div className="flex flex-col space-y-1.5">
+                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 h-10 leading-tight">
+                  <DollarSign className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>Valor de Inscripción (COP)</span>
                 </label>
                 <input
                   type="number"
@@ -581,15 +582,15 @@ export default function FormularioEventoCliente({
                   placeholder="0 para evento gratuito"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-medium outline-none transition"
                 />
-                <span className="text-[10px] text-slate-400">
+                <span className="text-[10px] text-slate-400 min-h-[2.25rem] leading-tight">
                   Si es de pago, el profesor registrará el recaudo en efectivo.
                 </span>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <Users className="w-3.5 h-3.5 text-[#0B305B]" />
-                  Aforo / Capacidad Máxima
+              <div className="flex flex-col space-y-1.5">
+                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 h-10 leading-tight">
+                  <Users className="w-3.5 h-3.5 text-[#0B305B] shrink-0" />
+                  <span>Aforo / Capacidad Máxima</span>
                 </label>
                 <input
                   type="number"
@@ -599,8 +600,27 @@ export default function FormularioEventoCliente({
                   placeholder="Vacío = Sin límite de cupos"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-medium outline-none transition"
                 />
-                <span className="text-[10px] text-slate-400">
+                <span className="text-[10px] text-slate-400 min-h-[2.25rem] leading-tight">
                   Límite de alumnos admitidos para preinscripción.
+                </span>
+              </div>
+
+              <div className="flex flex-col space-y-1.5">
+                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 h-10 leading-tight">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[#D2202E] shrink-0" />
+                  <span>Asistencias mínimas para certificar</span>
+                </label>
+                <input
+                  type="number"
+                  name="asistenciasMinimas"
+                  defaultValue={eventoInicial?.asistenciasMinimas ?? 1}
+                  min={1}
+                  required
+                  placeholder="1"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-medium outline-none transition"
+                />
+                <span className="text-[10px] text-slate-400 min-h-[2.25rem] leading-tight">
+                  Número de días/check-ins obligatorios para liberar el diploma. Por defecto es 1.
                 </span>
               </div>
             </div>

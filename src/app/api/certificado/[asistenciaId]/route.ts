@@ -17,6 +17,7 @@ export async function GET(
           inscripcion: {
             include: {
               usuario: true,
+              asistencias: true,
               evento: {
                 include: {
                   organizador: true,
@@ -70,6 +71,18 @@ export async function GET(
         {
           error:
             'Acceso no disponible: El evento aún no ha finalizado. El certificado oficial se emitirá al término de la jornada académica.',
+        },
+        { status: 403 }
+      )
+    }
+
+    // Guarda 3: Condición Asistencias Mínimas (Multidía)
+    const asistenciasMinimas = evento.asistenciasMinimas ?? 1
+    const totalAsistencias = inscripcion.asistencias?.length ?? 1
+    if (totalAsistencias < asistenciasMinimas) {
+      return NextResponse.json(
+        {
+          error: `Acceso no disponible: Se requieren mínimo ${asistenciasMinimas} asistencias para obtener el certificado oficial (registradas: ${totalAsistencias}).`,
         },
         { status: 403 }
       )

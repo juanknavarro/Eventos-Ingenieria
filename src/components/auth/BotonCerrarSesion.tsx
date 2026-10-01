@@ -73,11 +73,11 @@ export default function BotonCerrarSesion({
           role="dialog"
           aria-modal="true"
           aria-labelledby="titulo-modal-cierre-sesion"
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200 whitespace-normal"
           onClick={() => !cargando && setModalAbierto(false)}
         >
           <div
-            className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full p-6 sm:p-7 space-y-5 relative animate-in zoom-in-95 duration-200 border-t-4 border-[#D2202E]"
+            className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full p-6 sm:p-7 space-y-5 relative animate-in zoom-in-95 duration-200 border-t-4 border-[#D2202E] whitespace-normal break-words"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Botón Cerrar (X) */}
@@ -96,13 +96,13 @@ export default function BotonCerrarSesion({
               <div className="p-3.5 bg-rose-50 text-[#D2202E] rounded-2xl border border-rose-100 shrink-0">
                 <ShieldAlert className="w-6 h-6" />
               </div>
-              <div className="space-y-1 pr-6">
+              <div className="space-y-1 pr-6 min-w-0">
                 <span className="text-[10px] font-extrabold text-[#D2202E] uppercase tracking-wider block">
                   Universidad del Sinú &bull; Seguridad
                 </span>
                 <h3
                   id="titulo-modal-cierre-sesion"
-                  className="text-base sm:text-lg font-extrabold text-slate-900 leading-snug"
+                  className="text-base sm:text-lg font-extrabold text-slate-900 leading-snug whitespace-normal break-words"
                 >
                   ¿Estás seguro que deseas cerrar tu sesión actual?
                 </h3>
@@ -110,7 +110,7 @@ export default function BotonCerrarSesion({
             </div>
 
             {/* Mensaje descriptivo */}
-            <p className="text-xs text-slate-500 leading-relaxed">
+            <p className="text-xs text-slate-500 leading-relaxed whitespace-normal break-words">
               Finalizarás tu sesión de trabajo en los paneles internos de la Facultad. Para volver a acceder a las funciones administrativas, docentes o de control de acceso, deberás ingresar tus credenciales nuevamente.
             </p>
 

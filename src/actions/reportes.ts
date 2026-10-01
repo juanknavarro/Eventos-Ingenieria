@@ -70,7 +70,7 @@ export async function obtenerAnaliticasReportes(eventoIdFiltro?: string) {
         id: true,
         estado_pago: true,
         asignatura_bonificacion: true,
-        asistencia: {
+        asistencias: {
           select: {
             id: true,
             fechaHoraRegistro: true,
@@ -82,8 +82,8 @@ export async function obtenerAnaliticasReportes(eventoIdFiltro?: string) {
 
   const totalInscritos = inscripciones.length
   const pagados = inscripciones.filter((i) => i.estado_pago === 'PAGADO' || i.estado_pago === 'EXENTO').length
-  const asistencias = inscripciones.filter((i) => i.asistencia !== null)
-  const totalAsistentes = asistencias.length
+  const conAsistencia = inscripciones.filter((i) => i.asistencias.length > 0)
+  const totalAsistentes = conAsistencia.length
 
   // 1. Embudo de conversión
   const embudo = [
@@ -115,14 +115,16 @@ export async function obtenerAnaliticasReportes(eventoIdFiltro?: string) {
     contadorHoras[horaFormateada] = 0
   }
 
-  for (const ins of asistencias) {
-    if (ins.asistencia?.fechaHoraRegistro) {
-      const fecha = new Date(ins.asistencia.fechaHoraRegistro)
-      const horaStr = `${fecha.getHours().toString().padStart(2, '0')}:00`
-      if (contadorHoras[horaStr] !== undefined) {
-        contadorHoras[horaStr]++
-      } else {
-        contadorHoras[horaStr] = 1
+  for (const ins of conAsistencia) {
+    for (const asis of ins.asistencias) {
+      if (asis?.fechaHoraRegistro) {
+        const fecha = new Date(asis.fechaHoraRegistro)
+        const horaStr = `${fecha.getHours().toString().padStart(2, '0')}:00`
+        if (contadorHoras[horaStr] !== undefined) {
+          contadorHoras[horaStr]++
+        } else {
+          contadorHoras[horaStr] = 1
+        }
       }
     }
   }

@@ -87,7 +87,9 @@ export async function consultarCertificadosEstudiante(
           inscripciones: {
             include: {
               evento: true,
-              asistencia: true,
+              asistencias: {
+                orderBy: { fechaHoraRegistro: 'desc' },
+              },
             },
             orderBy: { fechaInscripcion: 'desc' },
           },
@@ -114,25 +116,28 @@ export async function consultarCertificadosEstudiante(
 
     for (const ins of usuario.inscripciones) {
       const ev = ins.evento as any
-      const tieneAsistencia = !!ins.asistencia
+      const totalAsistencias = ins.asistencias.length
+      const asistenciasMinimas = ins.evento.asistenciasMinimas ?? 1
+      const cumpleAsistencias = totalAsistencias >= asistenciasMinimas
       const esEventoFinalizado = ev.estado === 'FINALIZADO' || (ev.fechaFin && new Date(ev.fechaFin) <= ahora)
       const estaSolvente = ev.precio === 0 || ins.estado_pago === 'PAGADO' || ins.estado_pago === 'EXENTO'
 
       // Triple condición para liberar Diploma Oficial:
-      // 1. Asistencia física real en BD
+      // 1. Asistencias mínimas cumplidas (asistencias.length >= evento.asistenciasMinimas)
       // 2. Evento Finalizado (post-evento)
       // 3. Solvencia Financiera (Gratis, Pagado o Exento)
-      if (ins.asistencia && esEventoFinalizado && estaSolvente) {
+      if (cumpleAsistencias && esEventoFinalizado && estaSolvente) {
+        const ultimaAsistencia = ins.asistencias[0]
         eventosAsistidos.push({
           inscripcionId: ins.id,
-          asistenciaId: ins.asistencia.id,
+          asistenciaId: ultimaAsistencia?.id || '',
           eventoId: ins.evento.id,
           eventoTitulo: ins.evento.titulo,
           eventoFecha: ins.evento.fechaInicio,
           eventoUbicacion: ins.evento.ubicacion,
           eventoPrecio: ins.evento.precio,
           asignaturaBonificacion: ins.asignatura_bonificacion,
-          horaAsistencia: ins.asistencia.fechaHoraRegistro,
+          horaAsistencia: ultimaAsistencia?.fechaHoraRegistro || ins.fechaInscripcion,
           estadoPago: ins.estado_pago,
           certificadoPlantillaUrl: ev?.certificado_plantilla_url || null,
           escarapelaPlantillaUrl: ev?.escarapela_plantilla_url || null,
@@ -150,7 +155,7 @@ export async function consultarCertificadosEstudiante(
           motivo = 'PAGO_RECHAZADO'
         } else if (!estaSolvente) {
           motivo = 'PAGO_PENDIENTE'
-        } else if (tieneAsistencia && !esEventoFinalizado) {
+        } else if (cumpleAsistencias && !esEventoFinalizado) {
           motivo = 'EVENTO_EN_CURSO'
         } else {
           motivo = 'SIN_ASISTENCIA'

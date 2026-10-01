@@ -125,6 +125,11 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
     const ubicacion = formData.get('ubicacion') as string
     const capacidadMaximaStr = formData.get('capacidadMaxima') as string
     const precioStr = formData.get('precio') as string
+    const asistenciasMinimasStr = (
+      (formData.get('asistenciasMinimas') as string) ||
+      (formData.get('asistencias_minimas') as string)
+    )?.trim()
+    const asistenciasMinimas = asistenciasMinimasStr ? Math.max(1, parseInt(asistenciasMinimasStr, 10)) : 1
     const estado = (formData.get('estado') as EstadoEvento) || EstadoEvento.PUBLICADO
     const imagenUrl = (formData.get('imagenUrl') as string) || null
 
@@ -275,6 +280,7 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
         ubicacion,
         capacidadMaxima: capacidadMaximaStr ? parseInt(capacidadMaximaStr, 10) : null,
         precio: precioStr ? parseFloat(precioStr) : 0.0,
+        asistenciasMinimas,
         estado,
         imagenUrl: imagenUrl || imagenCentralUrl,
         logo_fondo_url: logoFondoUrl,
@@ -344,6 +350,11 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
     const ubicacion = formData.get('ubicacion') as string
     const capacidadMaximaStr = formData.get('capacidadMaxima') as string
     const precioStr = formData.get('precio') as string
+    const asistenciasMinimasStr = (
+      (formData.get('asistenciasMinimas') as string) ||
+      (formData.get('asistencias_minimas') as string)
+    )?.trim()
+    const asistenciasMinimas = asistenciasMinimasStr ? Math.max(1, parseInt(asistenciasMinimasStr, 10)) : undefined
     const estado = formData.get('estado') as EstadoEvento
     const imagenUrl = (formData.get('imagenUrl') as string) || null
 
@@ -502,6 +513,7 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
         ubicacion,
         capacidadMaxima: capacidadMaximaStr ? parseInt(capacidadMaximaStr, 10) : null,
         precio: precioStr ? parseFloat(precioStr) : 0.0,
+        asistenciasMinimas,
         estado,
         imagenUrl: imagenUrl || imagenCentralUrl,
         logo_fondo_url: logoFondoUrl,

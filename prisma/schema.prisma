@@ -149,6 +149,7 @@ model Evento {
   programa_academico   String?      @default("Facultad de Ingenierías") // Programa académico (Multi-Tenancy)
   programaId           String?
   programa             Programa?    @relation(fields: [programaId], references: [id], onDelete: SetNull)
+  asistenciasMinimas   Int          @default(1)
   organizadorId        String
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
@@ -186,10 +187,10 @@ model Inscripcion {
   updatedAt                   DateTime   @updatedAt
 
   // Relaciones
-  evento              Evento      @relation(fields: [eventoId], references: [id], onDelete: Cascade)
-  usuario             Usuario     @relation("UsuarioInscrito", fields: [usuarioId], references: [id], onDelete: Cascade)
-  profesorResponsable Usuario?    @relation("ProfesorResponsable", fields: [profesorResponsableId], references: [id], onDelete: SetNull)
-  asistencia          Asistencia?
+  evento              Evento        @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  usuario             Usuario       @relation("UsuarioInscrito", fields: [usuarioId], references: [id], onDelete: Cascade)
+  profesorResponsable Usuario?      @relation("ProfesorResponsable", fields: [profesorResponsableId], references: [id], onDelete: SetNull)
+  asistencias         Asistencia[]
 
   // Restricción única: Un usuario no puede inscribirse más de una vez al mismo evento
   @@unique([eventoId, usuarioId])
@@ -198,8 +199,9 @@ model Inscripcion {
 
 model Asistencia {
   id                 String           @id @default(cuid())
-  inscripcionId      String           @unique
+  inscripcionId      String
   fechaHoraRegistro  DateTime         @default(now())
+  fechaJornada       DateTime         @default(now()) @db.Date
   registradoPorId    String?          // Usuario (STAFF/PROFESOR/ADMIN) que validó la entrada
   metodo             MetodoAsistencia @default(QR)
   observaciones      String?
@@ -209,6 +211,7 @@ model Asistencia {
   inscripcion   Inscripcion @relation(fields: [inscripcionId], references: [id], onDelete: Cascade)
   registradoPor Usuario?    @relation("StaffRegistroAsistencia", fields: [registradoPorId], references: [id], onDelete: SetNull)
 
+  @@unique([inscripcionId, fechaJornada])
   @@map("asistencias")
 }
 

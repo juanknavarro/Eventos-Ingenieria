@@ -135,9 +135,12 @@ export async function registrarAsistenciaPorDocumento({
       },
       include: {
         evento: true,
-        asistencia: {
+        asistencias: {
           include: {
             registradoPor: true,
+          },
+          orderBy: {
+            fechaHoraRegistro: 'desc',
           },
         },
       },
@@ -225,14 +228,39 @@ export async function registrarAsistenciaPorDocumento({
       }
     }
 
-    // 4. Validar si ya tiene asistencia registrada (Doble Check-in)
-    if (inscripcion.asistencia) {
+    // 4. Validar si ya tiene asistencia registrada hoy (Doble Check-in en la misma jornada)
+    const hoy = new Date()
+    const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 0, 0, 0, 0)
+    const finHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 23, 59, 59, 999)
+
+    const asistenciaHoy = inscripcion.asistencias.find((a) => {
+      if (a.fechaJornada) {
+        const fj = new Date(a.fechaJornada)
+        if (
+          fj.getUTCFullYear() === hoy.getUTCFullYear() &&
+          fj.getUTCMonth() === hoy.getUTCMonth() &&
+          fj.getUTCDate() === hoy.getUTCDate()
+        ) {
+          return true
+        }
+      }
+      const fr = new Date(a.fechaHoraRegistro)
+      return fr >= inicioHoy && fr <= finHoy
+    })
+
+    if (asistenciaHoy) {
+      const horaStr = new Date(asistenciaHoy.fechaHoraRegistro).toLocaleTimeString('es-CO', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
+      const asistenciasTotales = inscripcion.asistencias.length
+      const asistenciasMinimas = inscripcion.evento.asistenciasMinimas || 1
+
       return {
         success: false,
         tipo: 'YA_REGISTRADO',
-        mensaje: `Atención: Asistencia ya registrada previamente a las ${new Date(
-          inscripcion.asistencia.fechaHoraRegistro
-        ).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}.`,
+        mensaje: `Atención: Asistencia de hoy ya registrada previamente a las ${horaStr}. Lleva ${asistenciasTotales} de ${asistenciasMinimas} asistencias requeridas.`,
         usuario: {
           id: usuario.id,
           nombre: usuario.nombre,
@@ -254,22 +282,24 @@ export async function registrarAsistenciaPorDocumento({
           montoPagado: inscripcion.montoPagado,
         },
         asistencia: {
-          id: inscripcion.asistencia.id,
-          fechaHoraRegistro: inscripcion.asistencia.fechaHoraRegistro,
-          metodo: inscripcion.asistencia.metodo,
-          registradoPorNombre: inscripcion.asistencia.registradoPor?.nombre,
+          id: asistenciaHoy.id,
+          fechaHoraRegistro: asistenciaHoy.fechaHoraRegistro,
+          metodo: asistenciaHoy.metodo,
+          registradoPorNombre: asistenciaHoy.registradoPor?.nombre,
         },
       }
     }
 
     // 5. Registrar asistencia exitosa en la base de datos
+    const fechaActual = new Date()
     const nuevaAsistencia = await prisma.asistencia.create({
       data: {
         inscripcionId: inscripcion.id,
         registradoPorId: staffId || session.id,
         metodo: (metodo as MetodoAsistencia) || MetodoAsistencia.QR,
         observaciones: 'Ingreso validado en puerta con lector de código de barras/cédula',
-        fechaHoraRegistro: new Date(),
+        fechaHoraRegistro: fechaActual,
+        fechaJornada: fechaActual,
       },
       include: {
         registradoPor: true,
@@ -284,10 +314,13 @@ export async function registrarAsistenciaPorDocumento({
       // Manejar llamadas fuera del ciclo de petición HTTP
     }
 
+    const conteoActual = inscripcion.asistencias.length + 1
+    const metaAsistencias = inscripcion.evento.asistenciasMinimas || 1
+
     return {
       success: true,
       tipo: 'EXITO',
-      mensaje: `¡ACCESO PERMITIDO! Asistencia confirmada para ${usuario.nombre}.`,
+      mensaje: `¡Check-in exitoso! Lleva ${conteoActual} de ${metaAsistencias} asistencias requeridas (${usuario.nombre}).`,
       usuario: {
         id: usuario.id,
         nombre: usuario.nombre,
