@@ -66,16 +66,24 @@ export default async function ReportesPage() {
     precio: e.precio,
     estado: e.estado,
     capacidadMaxima: e.capacidadMaxima,
+    asistenciasMinimas: e.asistenciasMinimas || 1,
     programa_academico: e.programa_academico,
   }))
 
   const inscripcionesMapeadas = inscripciones.map((ins) => {
+    const meta = ins.evento.asistenciasMinimas || 1
+    const totalAsistencias = ins.asistencias.length
+    const cumpleMeta = totalAsistencias >= meta
     const ultimaAsistencia = ins.asistencias[0]
+
     return {
       id: ins.id,
       eventoId: ins.eventoId,
       eventoTitulo: ins.evento.titulo,
       eventoPrecio: ins.evento.precio,
+      asistenciasMinimas: meta,
+      totalAsistencias,
+      cumpleMeta,
       usuarioId: ins.usuarioId,
       usuarioNombre: ins.usuario.nombre,
       usuarioEmail: ins.usuario.email,
@@ -90,6 +98,14 @@ export default async function ReportesPage() {
       estadoPago: ins.estado_pago,
       montoPagado: ins.montoPagado,
       fechaInscripcion: ins.fechaInscripcion.toISOString(),
+      asistencias: ins.asistencias.map((a) => ({
+        id: a.id,
+        fechaHoraRegistro: a.fechaHoraRegistro.toISOString(),
+        fechaJornada: a.fechaJornada ? a.fechaJornada.toISOString() : null,
+        metodo: a.metodo,
+        registradoPorNombre: a.registradoPor?.nombre || 'Staff Oficial',
+        observaciones: a.observaciones,
+      })),
       asistencia: ultimaAsistencia
         ? {
             id: ultimaAsistencia.id,

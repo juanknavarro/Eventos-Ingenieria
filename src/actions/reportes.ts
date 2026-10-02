@@ -28,6 +28,7 @@ export interface MetricasAnaliticasReportes {
   aforo: {
     capacidadMaxima: number
     asistentesReales: number
+    asistentesCertificables?: number
     porcentajeOcupacion: number
     cuposDisponibles: number
   }
@@ -62,6 +63,7 @@ export async function obtenerAnaliticasReportes(eventoIdFiltro?: string) {
         id: true,
         titulo: true,
         capacidadMaxima: true,
+        asistenciasMinimas: true,
       },
     }),
     prisma.inscripcion.findMany({
@@ -70,10 +72,17 @@ export async function obtenerAnaliticasReportes(eventoIdFiltro?: string) {
         id: true,
         estado_pago: true,
         asignatura_bonificacion: true,
+        evento: {
+          select: {
+            asistenciasMinimas: true,
+          },
+        },
         asistencias: {
           select: {
             id: true,
             fechaHoraRegistro: true,
+            fechaJornada: true,
+            metodo: true,
           },
         },
       },
@@ -82,10 +91,14 @@ export async function obtenerAnaliticasReportes(eventoIdFiltro?: string) {
 
   const totalInscritos = inscripciones.length
   const pagados = inscripciones.filter((i) => i.estado_pago === 'PAGADO' || i.estado_pago === 'EXENTO').length
-  const conAsistencia = inscripciones.filter((i) => i.asistencias.length > 0)
-  const totalAsistentes = conAsistencia.length
+  const asistentesAlcance = inscripciones.filter((i) => i.asistencias.length > 0)
+  const asistentesCertificables = inscripciones.filter(
+    (i) => i.asistencias.length >= (i.evento?.asistenciasMinimas ?? 1)
+  )
+  const totalAsistentes = asistentesAlcance.length
+  const totalCertificables = asistentesCertificables.length
 
-  // 1. Embudo de conversión
+  // 1. Embudo de conversión (Multidía)
   const embudo = [
     {
       etapa: '1. Preinscritos',
@@ -100,9 +113,15 @@ export async function obtenerAnaliticasReportes(eventoIdFiltro?: string) {
       fill: '#2563EB',
     },
     {
-      etapa: '3. Asistentes en Puerta',
+      etapa: '3. Asistieron en Puerta (>= 1 día)',
       cantidad: totalAsistentes,
       porcentaje: totalInscritos > 0 ? Math.round((totalAsistentes / totalInscritos) * 100) : 0,
+      fill: '#F59E0B',
+    },
+    {
+      etapa: '4. Meta Cumplida / Certificables',
+      cantidad: totalCertificables,
+      porcentaje: totalInscritos > 0 ? Math.round((totalCertificables / totalInscritos) * 100) : 0,
       fill: '#D2202E',
     },
   ]
@@ -115,7 +134,7 @@ export async function obtenerAnaliticasReportes(eventoIdFiltro?: string) {
     contadorHoras[horaFormateada] = 0
   }
 
-  for (const ins of conAsistencia) {
+  for (const ins of asistentesAlcance) {
     for (const asis of ins.asistencias) {
       if (asis?.fechaHoraRegistro) {
         const fecha = new Date(asis.fechaHoraRegistro)
@@ -164,6 +183,7 @@ export async function obtenerAnaliticasReportes(eventoIdFiltro?: string) {
     aforo: {
       capacidadMaxima,
       asistentesReales: totalAsistentes,
+      asistentesCertificables: totalCertificables,
       porcentajeOcupacion,
       cuposDisponibles,
     },

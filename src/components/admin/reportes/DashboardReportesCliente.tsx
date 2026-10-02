@@ -51,7 +51,17 @@ export interface EventoOpcion {
   precio: number
   estado: string
   capacidadMaxima?: number | null
+  asistenciasMinimas?: number | null
   programa_academico?: string | null
+}
+
+export interface AsistenciaItemReporte {
+  id: string
+  fechaHoraRegistro: Date | string
+  fechaJornada?: Date | string | null
+  metodo: string
+  registradoPorNombre: string
+  observaciones: string | null
 }
 
 export interface InscripcionReporte {
@@ -59,6 +69,9 @@ export interface InscripcionReporte {
   eventoId: string
   eventoTitulo: string
   eventoPrecio: number
+  asistenciasMinimas?: number
+  totalAsistencias?: number
+  cumpleMeta?: boolean
   usuarioId: string
   usuarioNombre: string
   usuarioEmail: string
@@ -70,13 +83,8 @@ export interface InscripcionReporte {
   estadoPago: string
   montoPagado: number
   fechaInscripcion: Date | string
-  asistencia: {
-    id: string
-    fechaHoraRegistro: Date | string
-    metodo: string
-    registradoPorNombre: string
-    observaciones: string | null
-  } | null
+  asistencias?: AsistenciaItemReporte[]
+  asistencia: AsistenciaItemReporte | null
 }
 
 interface Props {
@@ -141,6 +149,24 @@ export default function DashboardReportesCliente({
     )
   }, [eventos, inscripciones, programaFiltro])
 
+  const [jornadaFiltro, setJornadaFiltro] = useState<string>('todas')
+
+  // Obtener lista única de jornadas disponibles para el evento / filtro actual
+  const jornadasDisponibles = useMemo(() => {
+    const fechas = new Set<string>()
+    for (const ins of inscripcionesFiltradas) {
+      const lista = ins.asistencias && ins.asistencias.length > 0 ? ins.asistencias : (ins.asistencia ? [ins.asistencia] : [])
+      for (const a of lista) {
+        if (a.fechaJornada) {
+          fechas.add(new Date(a.fechaJornada).toISOString().slice(0, 10))
+        } else if (a.fechaHoraRegistro) {
+          fechas.add(new Date(a.fechaHoraRegistro).toISOString().slice(0, 10))
+        }
+      }
+    }
+    return Array.from(fechas).sort()
+  }, [inscripcionesFiltradas])
+
   // Cálculo dinámico de KPIs principales
   const kpis = useMemo(() => {
     const totalInscritos = inscripcionesFiltradas.length
@@ -152,8 +178,21 @@ export default function DashboardReportesCliente({
     const pendientesCount = inscripcionesFiltradas.filter((i) => i.estadoPago === 'PENDIENTE').length
     const exentosCount = inscripcionesFiltradas.filter((i) => i.estadoPago === 'EXENTO').length
 
-    const asistentesReales = inscripcionesFiltradas.filter((i) => i.asistencia !== null).length
+    // Alumnos con al menos un ingreso en puerta (alcance)
+    const asistentesReales = inscripcionesFiltradas.filter((i) => {
+      const cant = i.totalAsistencias ?? i.asistencias?.length ?? (i.asistencia !== null ? 1 : 0)
+      return cant > 0
+    }).length
+
+    // Alumnos que completaron la meta requerida para certificar
+    const asistentesCertificables = inscripcionesFiltradas.filter((i) => {
+      const cant = i.totalAsistencias ?? i.asistencias?.length ?? (i.asistencia !== null ? 1 : 0)
+      const meta = i.asistenciasMinimas ?? 1
+      return cant >= meta
+    }).length
+
     const tasaAsistencia = totalInscritos > 0 ? (asistentesReales / totalInscritos) * 100 : 0
+    const tasaCertificables = totalInscritos > 0 ? (asistentesCertificables / totalInscritos) * 100 : 0
 
     const montoPendiente = inscripcionesFiltradas.reduce((acc, curr) => {
       if (curr.estadoPago === 'PENDIENTE') {
@@ -169,60 +208,83 @@ export default function DashboardReportesCliente({
       pendientesCount,
       exentosCount,
       asistentesReales,
+      asistentesCertificables,
       tasaAsistencia,
+      tasaCertificables,
       montoPendiente,
     }
   }, [inscripcionesFiltradas])
 
-  // 1. Gráfica de Embudo de Conversión (Funnel)
+  // 1. Gráfica de Embudo de Conversión (Funnel Multidía)
   const datosEmbudo = useMemo(() => {
     const total = kpis.totalInscritos
     const confirmados = kpis.pagadosCount + kpis.exentosCount
-    const asistentes = kpis.asistentesReales
+    const parciales = kpis.asistentesReales
+    const certificables = kpis.asistentesCertificables
 
     const pctConfirmados = total > 0 ? Math.round((confirmados / total) * 100) : 0
-    const pctAsistentes = total > 0 ? Math.round((asistentes / total) * 100) : 0
-    const pctConversionAsistencia = confirmados > 0 ? Math.round((asistentes / confirmados) * 100) : 0
+    const pctParciales = total > 0 ? Math.round((parciales / total) * 100) : 0
+    const pctCertificables = total > 0 ? Math.round((certificables / total) * 100) : 0
+    const pctConversionAsistencia = confirmados > 0 ? Math.round((certificables / confirmados) * 100) : 0
 
     return {
       chartData: [
         {
-          name: 'Preinscritos',
+          name: '1. Preinscritos',
           value: total,
           fill: '#0B305B',
           formattedValue: `${total} alumnos`,
         },
         {
-          name: 'Pagados / Confirmados',
+          name: '2. Pagados / Confirmados',
           value: confirmados,
           fill: '#2563EB',
           formattedValue: `${confirmados} (${pctConfirmados}%)`,
         },
         {
-          name: 'Check-in en Puerta',
-          value: asistentes,
+          name: '3. Asistencia en Puerta (>=1 día)',
+          value: parciales,
+          fill: '#F59E0B',
+          formattedValue: `${parciales} (${pctParciales}%)`,
+        },
+        {
+          name: '4. Meta Cumplida / Certificables',
+          value: certificables,
           fill: '#D2202E',
-          formattedValue: `${asistentes} (${pctAsistentes}%)`,
+          formattedValue: `${certificables} (${pctCertificables}%)`,
         },
       ],
       total,
       confirmados,
-      asistentes,
+      parciales,
+      certificables,
       pctConfirmados,
-      pctAsistentes,
+      pctParciales,
+      pctCertificables,
       pctConversionAsistencia,
     }
   }, [kpis])
 
-  // 2. Gráfica de Área: Picos de Asistencia por Franjas Horarias (Time Series)
-  const { datosHorariosCheckin, picoMaximo } = useMemo(() => {
-    const asistenciasValidadas = inscripcionesFiltradas
-      .map((i) => i.asistencia)
-      .filter((a): a is NonNullable<typeof a> => a !== null && !!a.fechaHoraRegistro)
+  // 2. Gráfica de Área: Picos de Asistencia por Franjas Horarias y Jornadas (Time Series)
+  const { datosHorariosCheckin, picoMaximo, totalCheckinsJornada } = useMemo(() => {
+    const todasAsistencias = inscripcionesFiltradas.flatMap((ins) => {
+      if (ins.asistencias && ins.asistencias.length > 0) return ins.asistencias
+      if (ins.asistencia) return [ins.asistencia]
+      return []
+    })
+
+    const asistenciasValidadas = todasAsistencias.filter((a) => {
+      if (!a.fechaHoraRegistro) return false
+      if (jornadaFiltro === 'todas') return true
+      const fStr = (a.fechaJornada ? new Date(a.fechaJornada) : new Date(a.fechaHoraRegistro))
+        .toISOString()
+        .slice(0, 10)
+      return fStr === jornadaFiltro
+    })
 
     const horasMap = new Map<string, number>()
-    // Rango habitual para eventos universitarios: 07:00 a 19:00
-    for (let h = 7; h <= 19; h++) {
+    // Rango habitual para eventos universitarios: 07:00 a 20:00
+    for (let h = 7; h <= 20; h++) {
       const horaStr = `${h.toString().padStart(2, '0')}:00`
       horasMap.set(horaStr, 0)
     }
@@ -246,8 +308,12 @@ export default function DashboardReportesCliente({
       }
     }
 
-    return { datosHorariosCheckin: items, picoMaximo: max }
-  }, [inscripcionesFiltradas])
+    return {
+      datosHorariosCheckin: items,
+      picoMaximo: max,
+      totalCheckinsJornada: asistenciasValidadas.length,
+    }
+  }, [inscripcionesFiltradas, jornadaFiltro])
 
   // 3. Gráfica de Barras Horizontales: Top de Asignaturas con Bonificación Académica
   const datosTopAsignaturas = useMemo(() => {
@@ -411,29 +477,44 @@ export default function DashboardReportesCliente({
     const ws2 = XLSX.utils.aoa_to_sheet(hoja2Datos)
     XLSX.utils.book_append_sheet(wb, ws2, 'Listado General')
 
-    // HOJA 3: Auditoría de Asistencia (Check-in en Puerta)
-    const asistenciasFiltradas = inscripcionesFiltradas.filter((ins) => ins.asistencia !== null)
+    // HOJA 3: Auditoría de Asistencia (Check-in en Puerta - Multidía)
+    const filasAuditoria: (string | number)[][] = []
+    for (const ins of inscripcionesFiltradas) {
+      const lista = ins.asistencias && ins.asistencias.length > 0 ? ins.asistencias : (ins.asistencia ? [ins.asistencia] : [])
+      for (const asis of lista) {
+        filasAuditoria.push([
+          ins.usuarioCedula || 'N/A',
+          ins.usuarioNombre,
+          ins.usuarioCarrera || 'Facultad de Ingenierías',
+          ins.eventoTitulo,
+          asis.fechaJornada
+            ? new Date(asis.fechaJornada).toLocaleDateString('es-CO')
+            : (asis.fechaHoraRegistro ? new Date(asis.fechaHoraRegistro).toLocaleDateString('es-CO') : 'Día Único'),
+          asis.fechaHoraRegistro ? new Date(asis.fechaHoraRegistro).toLocaleString('es-CO') : '',
+          asis.metodo || 'QR',
+          asis.registradoPorNombre || 'Staff Oficial',
+          asis.observaciones || 'Sin novedades',
+          `${ins.totalAsistencias ?? lista.length} de ${ins.asistenciasMinimas ?? 1}`,
+          (ins.cumpleMeta ?? (lista.length >= (ins.asistenciasMinimas ?? 1))) ? 'COMPLETA / CERTIFICABLE' : 'PARCIAL (EN CURSO)',
+        ])
+      }
+    }
+
     const hoja3Datos = [
       [
         'Cédula / ID',
         'Nombre del Asistente',
         'Programa Académico',
         'Evento Validado',
+        'Jornada / Fecha',
         'Fecha y Hora Check-in',
         'Método de Escaneo',
         'Validado Por (Staff / Docente)',
         'Observaciones de Entrada',
+        'Progreso Asistencias',
+        'Estado Diploma',
       ],
-      ...asistenciasFiltradas.map((ins) => [
-        ins.usuarioCedula || 'N/A',
-        ins.usuarioNombre,
-        ins.usuarioCarrera || 'Facultad de Ingenierías',
-        ins.eventoTitulo,
-        ins.asistencia ? new Date(ins.asistencia.fechaHoraRegistro).toLocaleString('es-CO') : '',
-        ins.asistencia?.metodo || 'QR',
-        ins.asistencia?.registradoPorNombre || 'Staff Oficial',
-        ins.asistencia?.observaciones || 'Sin novedades',
-      ]),
+      ...filasAuditoria,
     ]
     const ws3 = XLSX.utils.aoa_to_sheet(hoja3Datos)
     XLSX.utils.book_append_sheet(wb, ws3, 'Auditoría de Asistencia')
@@ -595,18 +676,23 @@ export default function DashboardReportesCliente({
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Tasa de Asistencia
+              Efectividad Multidía
             </span>
             <div className="p-2.5 bg-rose-50 text-[#D2202E] rounded-xl">
               <TrendingUp className="w-5 h-5" />
             </div>
           </div>
           <div className="space-y-1">
-            <p className="text-2xl font-black text-[#D2202E] tracking-tight">
-              {kpis.tasaAsistencia.toFixed(1)}%
-            </p>
+            <div className="flex items-baseline gap-2">
+              <p className="text-2xl font-black text-[#D2202E] tracking-tight">
+                {kpis.tasaCertificables.toFixed(1)}%
+              </p>
+              <span className="text-xs text-slate-500 font-bold">
+                ({kpis.asistentesCertificables} certificados)
+              </span>
+            </div>
             <p className="text-[11px] text-slate-500 font-medium">
-              Efectividad de asistencia sobre total preinscritos
+              Alcance en puerta: {kpis.asistentesReales} ({kpis.tasaAsistencia.toFixed(1)}% de inscritos)
             </p>
           </div>
         </div>
@@ -624,14 +710,14 @@ export default function DashboardReportesCliente({
             <div>
               <h3 className="text-sm font-bold text-[#0B305B] flex items-center gap-2">
                 <Filter className="w-4 h-4 text-[#D2202E]" />
-                Embudo de Conversión Operativa
+                Embudo de Conversión Multidía
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Seguimiento de etapas: Preinscritos ➔ Pagos Validados ➔ Asistencia en Puerta
+                Preinscritos ➔ Pagados ➔ En Puerta (≥1 día) ➔ Certificables (Meta)
               </p>
             </div>
             <span className="text-[11px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl whitespace-nowrap">
-              {datosEmbudo.pctAsistentes}% Conversión Global
+              {datosEmbudo.pctCertificables}% Concluyeron Meta
             </span>
           </div>
 
@@ -659,7 +745,7 @@ export default function DashboardReportesCliente({
                       fill="#0B305B"
                       stroke="none"
                       dataKey="formattedValue"
-                      style={{ fontSize: '11px', fontWeight: 'bold' }}
+                      style={{ fontSize: '10px', fontWeight: 'bold' }}
                     />
                   </Funnel>
                 </FunnelChart>
@@ -670,21 +756,26 @@ export default function DashboardReportesCliente({
           </div>
 
           {/* Tarjetas resumen de fases del embudo con tasa de fuga */}
-          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center">
-            <div className="p-2.5 bg-slate-50 rounded-2xl border border-slate-200/60">
-              <span className="text-[10px] text-slate-500 font-bold uppercase block">Preinscritos</span>
-              <span className="text-base font-black text-[#0B305B]">{datosEmbudo.total}</span>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-100 text-center">
+            <div className="p-2 bg-slate-50 rounded-2xl border border-slate-200/60">
+              <span className="text-[9px] text-slate-500 font-bold uppercase block">Preinscritos</span>
+              <span className="text-sm sm:text-base font-black text-[#0B305B]">{datosEmbudo.total}</span>
               <span className="text-[9px] text-slate-400 block font-semibold">100% Base</span>
             </div>
-            <div className="p-2.5 bg-blue-50/60 rounded-2xl border border-blue-200/60">
-              <span className="text-[10px] text-blue-700 font-bold uppercase block">Confirmados</span>
-              <span className="text-base font-black text-blue-900">{datosEmbudo.confirmados}</span>
-              <span className="text-[9px] text-blue-600 block font-semibold">{datosEmbudo.pctConfirmados}% del total</span>
+            <div className="p-2 bg-blue-50/60 rounded-2xl border border-blue-200/60">
+              <span className="text-[9px] text-blue-700 font-bold uppercase block">Confirmados</span>
+              <span className="text-sm sm:text-base font-black text-blue-900">{datosEmbudo.confirmados}</span>
+              <span className="text-[9px] text-blue-600 block font-semibold">{datosEmbudo.pctConfirmados}%</span>
             </div>
-            <div className="p-2.5 bg-rose-50/60 rounded-2xl border border-rose-200/60">
-              <span className="text-[10px] text-rose-700 font-bold uppercase block">Asistieron</span>
-              <span className="text-base font-black text-[#D2202E]">{datosEmbudo.asistentes}</span>
-              <span className="text-[9px] text-rose-600 block font-semibold">{datosEmbudo.pctConversionAsistencia}% de los pagados</span>
+            <div className="p-2 bg-amber-50/60 rounded-2xl border border-amber-200/60">
+              <span className="text-[9px] text-amber-700 font-bold uppercase block">En Puerta</span>
+              <span className="text-sm sm:text-base font-black text-amber-900">{datosEmbudo.parciales}</span>
+              <span className="text-[9px] text-amber-600 block font-semibold">{datosEmbudo.pctParciales}%</span>
+            </div>
+            <div className="p-2 bg-rose-50/60 rounded-2xl border border-rose-200/60">
+              <span className="text-[9px] text-rose-700 font-bold uppercase block">Certificables</span>
+              <span className="text-sm sm:text-base font-black text-[#D2202E]">{datosEmbudo.certificables}</span>
+              <span className="text-[9px] text-rose-600 block font-semibold">{datosEmbudo.pctConversionAsistencia}% pagados</span>
             </div>
           </div>
         </div>
@@ -693,26 +784,42 @@ export default function DashboardReportesCliente({
         {/* CAJA 2: ÁREA DE HORARIOS DE CHECK-IN (PICOS DE AFLUENCIA) */}
         {/* ======================================================================= */}
         <div className="lg:col-span-6 bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-5">
-          <div className="border-b border-slate-100 pb-3 flex items-start justify-between gap-3">
+          <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="text-sm font-bold text-[#0B305B] flex items-center gap-2">
                 <Activity className="w-4 h-4 text-[#D2202E]" />
                 Curva de Afluencia y Horarios de Check-in
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Distribución temporal de validación de credenciales QR en accesos
+                Distribución temporal de accesos en portería
               </p>
             </div>
-            {picoMaximo.checkins > 0 && (
-              <span className="text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl flex items-center gap-1.5 whitespace-nowrap">
-                <Flame className="w-3.5 h-3.5 text-amber-600" />
-                Pico: {picoMaximo.hora} ({picoMaximo.checkins} check-ins)
-              </span>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {jornadasDisponibles.length > 1 && (
+                <select
+                  value={jornadaFiltro}
+                  onChange={(e) => setJornadaFiltro(e.target.value)}
+                  className="px-2.5 py-1 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl outline-none cursor-pointer transition"
+                >
+                  <option value="todas">Todas las jornadas ({jornadasDisponibles.length} días)</option>
+                  {jornadasDisponibles.map((j, idx) => (
+                    <option key={j} value={j}>
+                      Día {idx + 1} ({new Date(j + 'T12:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })})
+                    </option>
+                  ))}
+                </select>
+              )}
+              {picoMaximo.checkins > 0 && (
+                <span className="text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl flex items-center gap-1.5 whitespace-nowrap">
+                  <Flame className="w-3.5 h-3.5 text-amber-600" />
+                  Pico: {picoMaximo.hora} ({picoMaximo.checkins} check-ins)
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="h-64 w-full pt-1">
-            {mounted && kpis.asistentesReales > 0 ? (
+            {mounted && totalCheckinsJornada > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
                   data={datosHorariosCheckin}
@@ -762,12 +869,14 @@ export default function DashboardReportesCliente({
             )}
           </div>
 
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-xs text-slate-600">
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
             <span className="flex items-center gap-1.5 font-medium">
               <UserCheck className="w-4 h-4 text-emerald-600" />
-              Total Asistentes Verificados:
+              Check-ins Registrados: <strong className="text-[#0B305B]">{totalCheckinsJornada}</strong>
             </span>
-            <span className="font-black text-[#0B305B]">{kpis.asistentesReales} escaneos oficiales</span>
+            <span className="text-[11px] text-slate-500">
+              En puerta: <strong className="text-slate-800">{kpis.asistentesReales}</strong> • Certificables: <strong className="text-emerald-700">{kpis.asistentesCertificables}</strong>
+            </span>
           </div>
         </div>
 

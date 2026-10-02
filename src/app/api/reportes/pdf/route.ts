@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
           usuario: true,
           evento: true,
           profesorResponsable: true,
+          asistencias: true,
         },
       }),
       prisma.asistencia.findMany({
@@ -62,7 +63,9 @@ export async function GET(request: NextRequest) {
     ])
 
     const totalInscritos = inscripciones.length
-    const totalAsistentes = asistencias.length
+    // Alumnos únicos que asistieron (al menos 1 ingreso) para evitar tasas distorsionadas > 100% en eventos multidía
+    const alumnosAsistentesUnicos = inscripciones.filter((i) => i.asistencias.length > 0).length
+    const totalAsistentes = alumnosAsistentesUnicos
     const totalRecaudado = inscripciones.reduce(
       (acc, curr) => acc + (curr.estado_pago === 'PAGADO' ? curr.montoPagado : 0),
       0
