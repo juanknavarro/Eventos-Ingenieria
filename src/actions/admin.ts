@@ -747,6 +747,9 @@ export async function actualizarConfiguracionPlantillas(formData: FormData): Pro
 
     let logoUrl = (formData.get('logo_url') as string)?.trim() || '/imagen_2.png'
     let firmaDecanoUrl = (formData.get('firma_decano_url') as string)?.trim() || null
+    const institucion = (formData.get('institucion') as string)?.trim() || 'Universidad del Sinú'
+    const facultad = (formData.get('facultad') as string)?.trim() || 'Facultad de Ciencias e Ingenierías'
+    const seccional = (formData.get('seccional') as string)?.trim() || 'Seccional Montería'
     const nombreDecano = (formData.get('nombre_decano') as string)?.trim() || 'Ing. Roberto Gómez'
     const cargoFirmante = (formData.get('cargo_firmante') as string)?.trim() || 'Decano Facultad de Ciencias e Ingenierías'
     const colorPrimario = (formData.get('color_primario') as string)?.trim() || '#0B305B'
@@ -798,6 +801,9 @@ export async function actualizarConfiguracionPlantillas(formData: FormData): Pro
       where: { id: 'global_config' },
       create: {
         id: 'global_config',
+        institucion,
+        facultad,
+        seccional,
         logo_url: logoUrl,
         firma_decano_url: firmaDecanoUrl,
         nombre_decano: nombreDecano,
@@ -815,6 +821,9 @@ export async function actualizarConfiguracionPlantillas(formData: FormData): Pro
         contacto_horario: contactoHorario,
       },
       update: {
+        institucion,
+        facultad,
+        seccional,
         logo_url: logoUrl,
         firma_decano_url: firmaDecanoUrl,
         nombre_decano: nombreDecano,

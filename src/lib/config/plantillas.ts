@@ -3,6 +3,9 @@ import { rgb } from 'pdf-lib'
 
 export interface ConfiguracionPlantillasData {
   id: string
+  institucion?: string
+  facultad?: string
+  seccional?: string
   logo_url: string
   firma_decano_url: string | null
   nombre_decano: string
@@ -28,6 +31,9 @@ export interface ConfiguracionPlantillasData {
 
 export const CONFIG_PLANTILLAS_DEFAULT: ConfiguracionPlantillasData = {
   id: 'global_config',
+  institucion: 'Universidad del Sinú',
+  facultad: 'Facultad de Ciencias e Ingenierías',
+  seccional: 'Seccional Montería',
   logo_url: '/imagen_2.png',
   firma_decano_url: null,
   nombre_decano: 'Ing. Roberto Gómez',
@@ -61,6 +67,9 @@ export async function obtenerConfiguracionPlantillas(): Promise<ConfiguracionPla
       config = await prisma.configuracionPlantillas.create({
         data: {
           id: 'global_config',
+          institucion: CONFIG_PLANTILLAS_DEFAULT.institucion,
+          facultad: CONFIG_PLANTILLAS_DEFAULT.facultad,
+          seccional: CONFIG_PLANTILLAS_DEFAULT.seccional,
           logo_url: CONFIG_PLANTILLAS_DEFAULT.logo_url,
           firma_decano_url: CONFIG_PLANTILLAS_DEFAULT.firma_decano_url,
           nombre_decano: CONFIG_PLANTILLAS_DEFAULT.nombre_decano,

@@ -38,7 +38,11 @@ export interface MetricasAnaliticasReportes {
  * Consulta y pre-calcula los datos analíticos del módulo de Reportes y Auditorías
  * garantizando el aislamiento Multi-Tenancy (Zero-Trust).
  */
-export async function obtenerAnaliticasReportes(eventoIdFiltro?: string) {
+export async function obtenerAnaliticasReportes(
+  eventoIdFiltro?: string,
+  anioFiltro?: string,
+  semestreFiltro?: string
+) {
   const session = await getAuthSession()
   if (!session || !esAdminOSuperior(session)) {
     throw new Error('Acceso no autorizado: Se requieren credenciales de Administrador.')
@@ -47,14 +51,56 @@ export async function obtenerAnaliticasReportes(eventoIdFiltro?: string) {
   const filtroEventos = filtroEventosPorTenancy(session)
   const filtroInscripciones = filtroInscripcionesPorTenancy(session)
 
-  // Filtro adicional si se selecciona un evento en particular
-  const whereEventos = eventoIdFiltro && eventoIdFiltro !== 'todos'
-    ? { AND: [{ id: eventoIdFiltro }, filtroEventos] }
-    : filtroEventos
+  // Filtro temporal por Año y Semestre (Vigencia en UTC)
+  let filtroFechaEvento: any = {}
+  let filtroFechaInscripcion: any = {}
 
-  const whereInscripciones = eventoIdFiltro && eventoIdFiltro !== 'todos'
-    ? { AND: [{ eventoId: eventoIdFiltro }, filtroInscripciones] }
-    : filtroInscripciones
+  if (anioFiltro && anioFiltro !== 'todos') {
+    const anioNum = parseInt(anioFiltro, 10)
+    if (!isNaN(anioNum)) {
+      let inicioAnio = new Date(Date.UTC(anioNum, 0, 1, 0, 0, 0, 0))
+      let finAnio = new Date(Date.UTC(anioNum, 11, 31, 23, 59, 59, 999))
+
+      if (semestreFiltro === '1') {
+        finAnio = new Date(Date.UTC(anioNum, 5, 30, 23, 59, 59, 999))
+      } else if (semestreFiltro === '2') {
+        inicioAnio = new Date(Date.UTC(anioNum, 6, 1, 0, 0, 0, 0))
+      }
+
+      filtroFechaEvento = {
+        fechaInicio: {
+          gte: inicioAnio,
+          lte: finAnio,
+        },
+      }
+
+      filtroFechaInscripcion = {
+        evento: {
+          fechaInicio: {
+            gte: inicioAnio,
+            lte: finAnio,
+          },
+        },
+      }
+    }
+  }
+
+  // Filtro adicional si se selecciona un evento en particular
+  const whereEventos: any = {
+    AND: [
+      filtroEventos,
+      filtroFechaEvento,
+      ...(eventoIdFiltro && eventoIdFiltro !== 'todos' ? [{ id: eventoIdFiltro }] : []),
+    ],
+  }
+
+  const whereInscripciones: any = {
+    AND: [
+      filtroInscripciones,
+      filtroFechaInscripcion,
+      ...(eventoIdFiltro && eventoIdFiltro !== 'todos' ? [{ eventoId: eventoIdFiltro }] : []),
+    ],
+  }
 
   const [eventos, inscripciones] = await Promise.all([
     prisma.evento.findMany({

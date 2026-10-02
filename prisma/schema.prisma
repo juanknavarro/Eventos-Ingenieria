@@ -218,6 +218,9 @@ model Asistencia {
 // Configuración global de plantillas de certificados y escarapelas
 model ConfiguracionPlantillas {
   id               String   @id @default("global_config")
+  institucion      String   @default("Universidad del Sinú")
+  facultad         String   @default("Facultad de Ciencias e Ingenierías")
+  seccional        String   @default("Seccional Montería")
   logo_url         String   @default("/imagen_2.png")
   firma_decano_url String?  // URL o imagen de la firma escaneada del decano
   nombre_decano    String   @default("Ing. Roberto Gómez")

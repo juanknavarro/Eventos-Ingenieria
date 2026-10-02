@@ -28,6 +28,7 @@ import {
   Users,
   CheckCircle2,
   TrendingUp,
+  Calendar,
   FileSpreadsheet,
   FileText,
   Filter,
@@ -114,12 +115,53 @@ export default function DashboardReportesCliente({
   const [mounted, setMounted] = useState(false)
   const [eventoFiltro, setEventoFiltro] = useState<string>('todos')
   const [programaFiltro, setProgramaFiltro] = useState<string>('todos')
+  const [anioFiltro, setAnioFiltro] = useState<string>('todos')
+  const [semestreFiltro, setSemestreFiltro] = useState<string>('todos')
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // Filtrado de inscripciones según programa y evento seleccionado
+  // Extraer años disponibles dinámicamente basados en fechaInicio de eventos
+  const aniosDisponibles = useMemo(() => {
+    const anios = new Set<string>()
+    for (const ev of eventos) {
+      if (ev.fechaInicio) {
+        anios.add(new Date(ev.fechaInicio).getFullYear().toString())
+      }
+    }
+    return Array.from(anios).sort((a, b) => b.localeCompare(a))
+  }, [eventos])
+
+  // Filtrar eventos disponibles según programa, año y semestre
+  const eventosDisponibles = useMemo(() => {
+    let list = eventos
+    if (programaFiltro !== 'todos') {
+      const idsConInscripciones = new Set(
+        inscripciones
+          .filter((i) => i.usuarioCarrera?.toLowerCase().includes(programaFiltro.toLowerCase()))
+          .map((i) => i.eventoId)
+      )
+      list = list.filter(
+        (e) =>
+          e.titulo.toLowerCase().includes(programaFiltro.toLowerCase()) ||
+          idsConInscripciones.has(e.id)
+      )
+    }
+    if (anioFiltro !== 'todos') {
+      list = list.filter(
+        (e) => new Date(e.fechaInicio).getFullYear().toString() === anioFiltro
+      )
+      if (semestreFiltro === '1') {
+        list = list.filter((e) => new Date(e.fechaInicio).getMonth() <= 5)
+      } else if (semestreFiltro === '2') {
+        list = list.filter((e) => new Date(e.fechaInicio).getMonth() >= 6)
+      }
+    }
+    return list
+  }, [eventos, inscripciones, programaFiltro, anioFiltro, semestreFiltro])
+
+  // Filtrado de inscripciones según programa, año y evento seleccionado
   const inscripcionesFiltradas = useMemo(() => {
     let list = inscripciones
     if (programaFiltro !== 'todos') {
@@ -130,24 +172,12 @@ export default function DashboardReportesCliente({
     }
     if (eventoFiltro !== 'todos') {
       list = list.filter((ins) => ins.eventoId === eventoFiltro)
+    } else if (anioFiltro !== 'todos') {
+      const idsEventosDelAnio = new Set(eventosDisponibles.map((e) => e.id))
+      list = list.filter((ins) => idsEventosDelAnio.has(ins.eventoId))
     }
     return list
-  }, [eventoFiltro, programaFiltro, inscripciones])
-
-  // Filtrar eventos disponibles según programa
-  const eventosDisponibles = useMemo(() => {
-    if (programaFiltro === 'todos') return eventos
-    const idsConInscripciones = new Set(
-      inscripciones
-        .filter((i) => i.usuarioCarrera?.toLowerCase().includes(programaFiltro.toLowerCase()))
-        .map((i) => i.eventoId)
-    )
-    return eventos.filter(
-      (e) =>
-        e.titulo.toLowerCase().includes(programaFiltro.toLowerCase()) ||
-        idsConInscripciones.has(e.id)
-    )
-  }, [eventos, inscripciones, programaFiltro])
+  }, [eventoFiltro, programaFiltro, anioFiltro, eventosDisponibles, inscripciones])
 
   const [jornadaFiltro, setJornadaFiltro] = useState<string>('todas')
 
@@ -421,6 +451,7 @@ export default function DashboardReportesCliente({
       ['Facultad de Ciencias e Ingenierías'],
       ['Fecha de Generación:', new Date().toLocaleString('es-CO')],
       ['Evento Consultado:', eventoInfo],
+      ['Vigencia / Período:', anioFiltro === 'todos' ? 'Histórico Completo' : (semestreFiltro === 'todos' ? `Año ${anioFiltro} (Completo)` : `Año ${anioFiltro} — Semestre ${semestreFiltro}`)],
       [],
       ['INDICADOR / MÉTRICA', 'VALOR'],
       ['Total Recaudado (Efectivo)', `$${kpis.totalRecaudado.toLocaleString('es-CO')} COP`],
@@ -447,6 +478,12 @@ export default function DashboardReportesCliente({
 
     // HOJA 2: Listado General de Inscritos
     const hoja2Datos = [
+      ['LISTADO GENERAL DE INSCRITOS Y AUDITORÍA — UNIVERSIDAD DEL SINÚ'],
+      ['Facultad de Ciencias e Ingenierías'],
+      ['Fecha de Generación:', new Date().toLocaleString('es-CO')],
+      ['Evento Consultado:', eventoInfo],
+      ['Vigencia / Período:', anioFiltro === 'todos' ? 'Histórico Completo' : (semestreFiltro === 'todos' ? `Año ${anioFiltro} (Completo)` : `Año ${anioFiltro} — Semestre ${semestreFiltro}`)],
+      [],
       [
         'Cédula / ID',
         'Nombre del Estudiante',
@@ -501,6 +538,12 @@ export default function DashboardReportesCliente({
     }
 
     const hoja3Datos = [
+      ['AUDITORÍA DE ASISTENCIA Y CHECK-IN EN PUERTA — UNIVERSIDAD DEL SINÚ'],
+      ['Facultad de Ciencias e Ingenierías'],
+      ['Fecha de Generación:', new Date().toLocaleString('es-CO')],
+      ['Evento Consultado:', eventoInfo],
+      ['Vigencia / Período:', anioFiltro === 'todos' ? 'Histórico Completo' : (semestreFiltro === 'todos' ? `Año ${anioFiltro} (Completo)` : `Año ${anioFiltro} — Semestre ${semestreFiltro}`)],
+      [],
       [
         'Cédula / ID',
         'Nombre del Asistente',
@@ -519,7 +562,11 @@ export default function DashboardReportesCliente({
     const ws3 = XLSX.utils.aoa_to_sheet(hoja3Datos)
     XLSX.utils.book_append_sheet(wb, ws3, 'Auditoría de Asistencia')
 
-    const nombreArchivo = `Reporte_Auditoria_Unisinu_${Date.now()}.xlsx`
+    const prefijoPeriodo =
+      anioFiltro === 'todos'
+        ? 'Historico'
+        : `${anioFiltro}${semestreFiltro !== 'todos' ? `_S${semestreFiltro}` : ''}`
+    const nombreArchivo = `Reporte_Auditoria_Unisinu_${prefijoPeriodo}_${Date.now()}.xlsx`
     XLSX.writeFile(wb, nombreArchivo)
   }
 
@@ -555,6 +602,56 @@ export default function DashboardReportesCliente({
             </div>
           )}
 
+          {/* Selector de Año Académico */}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-[#0B305B] shrink-0">
+              <Calendar className="w-4 h-4 text-[#D2202E]" />
+              Año:
+            </div>
+
+            <select
+              value={anioFiltro}
+              onChange={(e) => {
+                const val = e.target.value
+                setAnioFiltro(val)
+                if (val === 'todos') {
+                  setSemestreFiltro('todos')
+                }
+                setEventoFiltro('todos')
+              }}
+              className="w-full sm:w-44 px-3.5 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-bold text-slate-800 outline-none transition cursor-pointer"
+            >
+              <option value="todos">Todos los Años (Histórico)</option>
+              {aniosDisponibles.map((a) => (
+                <option key={a} value={a}>
+                  Vigencia {a}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Selector de Semestre Académico */}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-[#0B305B] shrink-0">
+              <BookOpen className="w-4 h-4 text-[#D2202E]" />
+              Semestre:
+            </div>
+
+            <select
+              value={semestreFiltro}
+              disabled={anioFiltro === 'todos'}
+              onChange={(e) => {
+                setSemestreFiltro(e.target.value)
+                setEventoFiltro('todos')
+              }}
+              className="w-full sm:w-48 px-3.5 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-bold text-slate-800 outline-none transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <option value="todos">Año Completo (Ambos Semestres)</option>
+              <option value="1">Semestre 1 (Ene-Jun)</option>
+              <option value="2">Semestre 2 (Jul-Dic)</option>
+            </select>
+          </div>
+
           {/* Selector de Evento */}
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <div className="flex items-center gap-1.5 text-xs font-bold text-[#0B305B] shrink-0">
@@ -589,7 +686,7 @@ export default function DashboardReportesCliente({
           </button>
 
           <a
-            href={`/api/reportes/pdf?eventoId=${eventoFiltro}`}
+            href={`/api/reportes/pdf?eventoId=${eventoFiltro}&anio=${anioFiltro}&semestre=${semestreFiltro}&programa=${programaFiltro}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex-1 sm:flex-initial px-4 py-2.5 bg-[#D2202E] hover:bg-[#B01824] text-white font-bold text-xs rounded-xl shadow-md shadow-[#D2202E]/20 transition flex items-center justify-center gap-2 cursor-pointer"

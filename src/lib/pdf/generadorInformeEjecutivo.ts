@@ -4,6 +4,10 @@ import path from 'path'
 import { hexToRgbColor } from '@/lib/config/plantillas'
 
 export interface DatosInformeEjecutivo {
+  institucion?: string
+  facultad?: string
+  seccional?: string
+  cargoAdmin?: string
   tituloEvento: string
   rangoFechas: string
   ubicacion: string
@@ -111,14 +115,18 @@ export async function generarPdfInformeEjecutivo(datos: DatosInformeEjecutivo): 
   }
 
   // Textos de cabecera
-  page.drawText('UNIVERSIDAD DEL SINÚ', {
+  const nombreInstitucion = (datos.institucion || 'UNIVERSIDAD DEL SINÚ').toUpperCase()
+  const nombreFacultad = (datos.facultad || 'FACULTAD DE CIENCIAS E INGENIERÍAS').toUpperCase()
+  const nombreSeccional = (datos.seccional || 'SECCIONAL MONTERÍA').toUpperCase()
+
+  page.drawText(nombreInstitucion, {
     x: 180,
     y: height - 32,
     size: 13,
     font: helveticaBold,
     color: rgb(1, 1, 1),
   })
-  page.drawText('FACULTAD DE CIENCIAS E INGENIERÍAS — SECCIONAL CARTAGENA', {
+  page.drawText(`${nombreFacultad} — ${nombreSeccional}`, {
     x: 180,
     y: height - 46,
     size: 7.5,
@@ -440,7 +448,7 @@ export async function generarPdfInformeEjecutivo(datos: DatosInformeEjecutivo): 
     font: helveticaBold,
     color: rgb(0.1, 0.1, 0.2),
   })
-  page.drawText('Administrador del Sistema y Auditoría', {
+  page.drawText(datos.cargoAdmin || 'Administrador del Sistema y Auditoría', {
     x: width - 240,
     y: yFirmas - 24,
     size: 7,
@@ -457,7 +465,8 @@ export async function generarPdfInformeEjecutivo(datos: DatosInformeEjecutivo): 
     color: cPrimario,
   })
 
-  page.drawText('Documento generado automáticamente por el Sistema de Eventos de la Facultad de Ciencias e Ingenierías - Unisinú', {
+  const textoPie = `Documento generado automáticamente por el Sistema de Eventos de la ${datos.facultad || 'Facultad de Ciencias e Ingenierías'} - ${datos.institucion || 'Universidad del Sinú'}`
+  page.drawText(textoPie, {
     x: 45,
     y: 8,
     size: 6.5,

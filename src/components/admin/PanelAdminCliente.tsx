@@ -154,6 +154,15 @@ export default function PanelAdminCliente({
   // Estados interactivos para previsualización y formulario de Plantillas PDF
   const [colorPrimario, setColorPrimario] = useState(configPlantillas?.color_primario || '#0B305B')
   const [colorSecundario, setColorSecundario] = useState(configPlantillas?.color_secundario || '#D2202E')
+  const [institucionInput, setInstitucionInput] = useState(
+    configPlantillas?.institucion || 'Universidad del Sinú'
+  )
+  const [facultadInput, setFacultadInput] = useState(
+    configPlantillas?.facultad || 'Facultad de Ciencias e Ingenierías'
+  )
+  const [seccionalInput, setSeccionalInput] = useState(
+    configPlantillas?.seccional || 'Seccional Montería'
+  )
   const [nombreDecanoInput, setNombreDecanoInput] = useState(
     configPlantillas?.nombre_decano || 'Ing. Roberto Gómez'
   )
@@ -924,6 +933,60 @@ export default function PanelAdminCliente({
                 valorInicialUrl={configPlantillas?.firma_decano_url || ''}
                 aspectoRecomendado="PNG con fondo transparente (2.5:1 o 3:1)"
               />
+            </div>
+          </div>
+
+          {/* Tarjeta: Identidad Institucional y Sede */}
+          <div className="bg-white p-6 sm:p-7 rounded-3xl border border-slate-200 shadow-sm space-y-5">
+            <div className="border-b border-slate-100 pb-3">
+              <h3 className="font-bold text-xs text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-[#0B305B]" />
+                Identidad Institucional y Sede
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Parámetros oficiales de la institución, facultad y sede/seccional utilizados en informes ejecutivos, certificados y auditorías.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Nombre de la Institución</label>
+                <input
+                  type="text"
+                  name="institucion"
+                  value={institucionInput}
+                  onChange={(e) => setInstitucionInput(e.target.value)}
+                  required
+                  placeholder="Ej. Universidad del Sinú"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-bold outline-none transition"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Facultad Principal</label>
+                <input
+                  type="text"
+                  name="facultad"
+                  value={facultadInput}
+                  onChange={(e) => setFacultadInput(e.target.value)}
+                  required
+                  placeholder="Ej. Facultad de Ciencias e Ingenierías"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-bold outline-none transition"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">Sede / Seccional</label>
+                <input
+                  type="text"
+                  name="seccional"
+                  value={seccionalInput}
+                  onChange={(e) => setSeccionalInput(e.target.value)}
+                  required
+                  placeholder="Ej. Seccional Montería o Seccional Cartagena"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-bold outline-none transition"
+                />
+              </div>
             </div>
           </div>
 
