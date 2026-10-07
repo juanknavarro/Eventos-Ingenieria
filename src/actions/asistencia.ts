@@ -2,7 +2,7 @@
 
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
-import { MetodoAsistencia, EstadoPago, RolUsuario } from '@prisma/client'
+import { MetodoAsistencia, EstadoPago, RolUsuario, BloqueJornada } from '@prisma/client'
 import { getAuthSession } from '@/lib/auth/session'
 
 export interface ValidarAsistenciaInput {
@@ -10,6 +10,7 @@ export interface ValidarAsistenciaInput {
   eventoId: string
   staffId?: string
   metodo?: 'QR' | 'MANUAL' | 'BIOMETRICO'
+  bloque?: 'MANANA' | 'TARDE' | 'NOCHE' | 'UNICA' | string
 }
 
 export type TipoResultadoAsistencia =
@@ -51,6 +52,7 @@ export interface ResultadoAsistencia {
     fechaHoraRegistro: Date
     metodo: string
     registradoPorNombre?: string
+    bloque?: string
   }
 }
 
@@ -59,6 +61,7 @@ export async function registrarAsistenciaPorDocumento({
   eventoId,
   staffId,
   metodo = 'QR',
+  bloque = 'UNICA',
 }: ValidarAsistenciaInput): Promise<ResultadoAsistencia> {
   const docLimpio = documento.trim()
 
@@ -228,12 +231,29 @@ export async function registrarAsistenciaPorDocumento({
       }
     }
 
-    // 4. Validar si ya tiene asistencia registrada hoy (Doble Check-in en la misma jornada)
+    // 4. Validar si ya tiene asistencia registrada hoy en el mismo bloque/jornada
     const hoy = new Date()
     const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 0, 0, 0, 0)
     const finHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 23, 59, 59, 999)
 
+    const bloqueValido: BloqueJornada =
+      bloque === 'MANANA' || bloque === 'TARDE' || bloque === 'NOCHE' || bloque === 'UNICA'
+        ? (bloque as BloqueJornada)
+        : BloqueJornada.UNICA
+
+    const etiquetaBloque =
+      bloqueValido === 'MANANA'
+        ? 'MAÑANA (AM)'
+        : bloqueValido === 'TARDE'
+        ? 'TARDE (PM)'
+        : bloqueValido === 'NOCHE'
+        ? 'NOCHE'
+        : 'JORNADA'
+
     const asistenciaHoy = inscripcion.asistencias.find((a) => {
+      const bloqueRegistro = a.bloque || BloqueJornada.UNICA
+      if (bloqueRegistro !== bloqueValido) return false
+
       if (a.fechaJornada) {
         const fj = new Date(a.fechaJornada)
         if (
@@ -260,7 +280,7 @@ export async function registrarAsistenciaPorDocumento({
       return {
         success: false,
         tipo: 'YA_REGISTRADO',
-        mensaje: `Atención: Asistencia de hoy ya registrada previamente a las ${horaStr}. Lleva ${asistenciasTotales} de ${asistenciasMinimas} asistencias requeridas.`,
+        mensaje: `Atención: Ya registrado en la sesión ${etiquetaBloque} de hoy a las ${horaStr}. Lleva ${asistenciasTotales} de ${asistenciasMinimas} asistencias requeridas.`,
         usuario: {
           id: usuario.id,
           nombre: usuario.nombre,
@@ -286,6 +306,7 @@ export async function registrarAsistenciaPorDocumento({
           fechaHoraRegistro: asistenciaHoy.fechaHoraRegistro,
           metodo: asistenciaHoy.metodo,
           registradoPorNombre: asistenciaHoy.registradoPor?.nombre,
+          bloque: asistenciaHoy.bloque,
         },
       }
     }
@@ -297,9 +318,10 @@ export async function registrarAsistenciaPorDocumento({
         inscripcionId: inscripcion.id,
         registradoPorId: staffId || session.id,
         metodo: (metodo as MetodoAsistencia) || MetodoAsistencia.QR,
-        observaciones: 'Ingreso validado en puerta con lector de código de barras/cédula',
+        observaciones: `Ingreso validado en puerta (${etiquetaBloque}) con lector de código de barras/cédula`,
         fechaHoraRegistro: fechaActual,
         fechaJornada: fechaActual,
+        bloque: bloqueValido,
       },
       include: {
         registradoPor: true,
@@ -320,7 +342,7 @@ export async function registrarAsistenciaPorDocumento({
     return {
       success: true,
       tipo: 'EXITO',
-      mensaje: `¡Check-in exitoso! Lleva ${conteoActual} de ${metaAsistencias} asistencias requeridas (${usuario.nombre}).`,
+      mensaje: `¡Check-in exitoso en sesión ${etiquetaBloque}! Lleva ${conteoActual} de ${metaAsistencias} asistencias requeridas (${usuario.nombre}).`,
       usuario: {
         id: usuario.id,
         nombre: usuario.nombre,
@@ -346,6 +368,7 @@ export async function registrarAsistenciaPorDocumento({
         fechaHoraRegistro: nuevaAsistencia.fechaHoraRegistro,
         metodo: nuevaAsistencia.metodo,
         registradoPorNombre: nuevaAsistencia.registradoPor?.nombre,
+        bloque: nuevaAsistencia.bloque,
       },
     }
   } catch (error) {

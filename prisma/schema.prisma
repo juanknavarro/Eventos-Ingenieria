@@ -44,6 +44,13 @@ enum MetodoAsistencia {
   BIOMETRICO
 }
 
+enum BloqueJornada {
+  MANANA
+  TARDE
+  NOCHE
+  UNICA
+}
+
 enum MetodoPago {
   EFECTIVO
   TRANSFERENCIA
@@ -202,6 +209,7 @@ model Asistencia {
   inscripcionId      String
   fechaHoraRegistro  DateTime         @default(now())
   fechaJornada       DateTime         @default(now()) @db.Date
+  bloque             BloqueJornada    @default(UNICA)
   registradoPorId    String?          // Usuario (STAFF/PROFESOR/ADMIN) que validó la entrada
   metodo             MetodoAsistencia @default(QR)
   observaciones      String?
@@ -211,7 +219,7 @@ model Asistencia {
   inscripcion   Inscripcion @relation(fields: [inscripcionId], references: [id], onDelete: Cascade)
   registradoPor Usuario?    @relation("StaffRegistroAsistencia", fields: [registradoPorId], references: [id], onDelete: SetNull)
 
-  @@unique([inscripcionId, fechaJornada])
+  @@unique([inscripcionId, fechaJornada, bloque])
   @@map("asistencias")
 }
 

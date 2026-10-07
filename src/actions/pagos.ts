@@ -82,6 +82,40 @@ export async function registrarPago({
       }
     }
 
+    // Validación antifraude: verificar si el número de referencia ya fue utilizado globalmente
+    if (metodoPago === 'TRANSFERENCIA' && numeroReferencia?.trim()) {
+      const refLimpia = numeroReferencia.trim()
+      const pagoDuplicado = await prisma.inscripcion.findFirst({
+        where: {
+          id: { not: inscripcionId },
+          estado_pago: EstadoPago.PAGADO,
+          comprobanteUrl: {
+            contains: refLimpia,
+            mode: 'insensitive',
+          },
+        },
+        include: {
+          usuario: {
+            select: {
+              nombre: true,
+            },
+          },
+          evento: {
+            select: {
+              titulo: true,
+            },
+          },
+        },
+      })
+
+      if (pagoDuplicado) {
+        return {
+          success: false,
+          error: `Error: El número de referencia #${refLimpia} ya fue utilizado globalmente. Fue registrado previamente para ${pagoDuplicado.usuario.nombre} en el evento "${pagoDuplicado.evento.titulo}".`,
+        }
+      }
+    }
+
     // Formatear referencia / comprobante según método
     let comprobanteTexto = ''
     if (metodoPago === 'TRANSFERENCIA') {

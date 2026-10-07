@@ -51,6 +51,21 @@ export default function EscanerQRPage() {
   const [ultimoResultado, setUltimoResultado] = useState<ResultadoAsistencia | null>(null)
   const [estadoVisor, setEstadoVisor] = useState<'IDLE' | 'EXITO' | 'ALERTA' | 'ERROR'>('IDLE')
 
+  // Selector de bloque / jornada (AM / PM / Noche)
+  const [bloqueSeleccionado, setBloqueSeleccionado] = useState<'MANANA' | 'TARDE' | 'NOCHE'>('MANANA')
+
+  // Auto-selección inteligente por reloj del sistema (<13h -> MANANA, 13h-18h -> TARDE, >18h -> NOCHE)
+  useEffect(() => {
+    const hora = new Date().getHours()
+    if (hora < 13) {
+      setBloqueSeleccionado('MANANA')
+    } else if (hora < 18) {
+      setBloqueSeleccionado('TARDE')
+    } else {
+      setBloqueSeleccionado('NOCHE')
+    }
+  }, [])
+
   // Entrada manual opcional
   const [mostrarManual, setMostrarManual] = useState<boolean>(false)
   const [inputManual, setInputManual] = useState<string>('')
@@ -162,6 +177,7 @@ export default function EscanerQRPage() {
           documento: docLimpio,
           eventoId,
           metodo: 'QR',
+          bloque: bloqueSeleccionado,
         })
 
         setUltimoResultado(resultado)
@@ -199,7 +215,7 @@ export default function EscanerQRPage() {
         })
       }
     },
-    [eventoId, emitirBeep, ejecutarVibracion]
+    [eventoId, emitirBeep, ejecutarVibracion, bloqueSeleccionado]
   )
 
   // Manejo de lectura QR por la cámara con cooldown estricto de 2.5s
@@ -419,6 +435,45 @@ export default function EscanerQRPage() {
         </div>
       </header>
 
+      {/* Selector Flotante de Sesión / Jornada (Pills) */}
+      <div className="absolute top-[70px] inset-x-0 z-30 flex items-center justify-center px-4 pointer-events-auto">
+        <div className="bg-black/80 backdrop-blur-md p-1 rounded-2xl border border-white/20 flex items-center gap-1 shadow-2xl">
+          <button
+            type="button"
+            onClick={() => setBloqueSeleccionado('MANANA')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              bloqueSeleccionado === 'MANANA'
+                ? 'bg-amber-400 text-slate-950 font-black shadow-md scale-105 ring-1 ring-amber-300'
+                : 'text-slate-300 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            ☀️ Mañana (AM)
+          </button>
+          <button
+            type="button"
+            onClick={() => setBloqueSeleccionado('TARDE')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              bloqueSeleccionado === 'TARDE'
+                ? 'bg-orange-500 text-white font-black shadow-md scale-105 ring-1 ring-orange-300'
+                : 'text-slate-300 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            ⛅ Tarde (PM)
+          </button>
+          <button
+            type="button"
+            onClick={() => setBloqueSeleccionado('NOCHE')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              bloqueSeleccionado === 'NOCHE'
+                ? 'bg-indigo-600 text-white font-black shadow-md scale-105 ring-1 ring-indigo-400'
+                : 'text-slate-300 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            🌙 Noche
+          </button>
+        </div>
+      </div>
+
       {/* 2. Área Central de Video del Escáner */}
       <div className="relative flex-1 w-full h-full flex items-center justify-center overflow-hidden">
         {/* Contenedor DOM para la librería Html5Qrcode */}
@@ -614,6 +669,46 @@ export default function EscanerQRPage() {
             </div>
 
             <form onSubmit={handleEnvioManual} className="space-y-4">
+              {/* Selector de Jornada dentro del Modal Manual */}
+              <div className="flex items-center justify-between bg-slate-950 p-2 rounded-xl border border-slate-800 text-xs">
+                <span className="text-slate-400 font-semibold text-[11px]">Sesión activa:</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setBloqueSeleccionado('MANANA')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                      bloqueSeleccionado === 'MANANA'
+                        ? 'bg-amber-400 text-slate-950'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    ☀️ AM
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBloqueSeleccionado('TARDE')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                      bloqueSeleccionado === 'TARDE'
+                        ? 'bg-orange-500 text-white'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    ⛅ PM
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBloqueSeleccionado('NOCHE')}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                      bloqueSeleccionado === 'NOCHE'
+                        ? 'bg-indigo-600 text-white'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    🌙 Noche
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <input
                   type="text"

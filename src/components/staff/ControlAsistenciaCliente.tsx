@@ -50,6 +50,7 @@ export interface AsistenciaHistorial {
   id: string
   fechaHoraRegistro: Date | string
   metodo: string
+  bloque?: string
   inscripcion: {
     asignatura_bonificacion: string | null
     usuario: {
@@ -106,6 +107,21 @@ export default function ControlAsistenciaCliente({
 
   // Sonido activado
   const [sonidoHabilitado, setSonidoHabilitado] = useState<boolean>(true)
+
+  // Bloque de jornada (AM / PM / Noche)
+  const [bloqueSeleccionado, setBloqueSeleccionado] = useState<'MANANA' | 'TARDE' | 'NOCHE'>('MANANA')
+
+  // Auto-selección inteligente por reloj del sistema (<13h -> MANANA, 13h-18h -> TARDE, >18h -> NOCHE)
+  useEffect(() => {
+    const hora = new Date().getHours()
+    if (hora < 13) {
+      setBloqueSeleccionado('MANANA')
+    } else if (hora < 18) {
+      setBloqueSeleccionado('TARDE')
+    } else {
+      setBloqueSeleccionado('NOCHE')
+    }
+  }, [])
 
   // Referencia para mantener el autofoco permanente
   const inputRef = useRef<HTMLInputElement>(null)
@@ -224,6 +240,7 @@ export default function ControlAsistenciaCliente({
         eventoId,
         staffId,
         metodo: 'QR',
+        bloque: bloqueSeleccionado,
       })
 
       setUltimoResultado(resultado)
@@ -236,6 +253,7 @@ export default function ControlAsistenciaCliente({
             id: resultado.asistencia.id,
             fechaHoraRegistro: new Date(),
             metodo: resultado.asistencia.metodo,
+            bloque: resultado.asistencia.bloque,
             inscripcion: {
               asignatura_bonificacion:
                 resultado.inscripcion?.asignatura_bonificacion || null,
@@ -358,6 +376,58 @@ export default function ControlAsistenciaCliente({
           <p className="text-slate-300 text-xs sm:text-sm max-w-xl mx-auto">
             Apunta la pistola lectora de código de barras al carnet o documento del estudiante. El lector enviará la cédula y ejecutará la validación automáticamente.
           </p>
+
+          {/* Selector de Sesión / Jornada con Botones Pill */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-center justify-center gap-2 pt-1 pb-1 flex-wrap"
+          >
+            <span className="text-xs font-semibold text-slate-300 mr-1">
+              Sesión / Jornada:
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setBloqueSeleccionado('MANANA')
+                inputRef.current?.focus()
+              }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                bloqueSeleccionado === 'MANANA'
+                  ? 'bg-amber-400 text-slate-950 shadow-md ring-2 ring-amber-300 font-extrabold scale-105'
+                  : 'bg-white/10 hover:bg-white/20 text-slate-200 border border-white/15'
+              }`}
+            >
+              ☀️ Mañana (AM)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setBloqueSeleccionado('TARDE')
+                inputRef.current?.focus()
+              }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                bloqueSeleccionado === 'TARDE'
+                  ? 'bg-orange-500 text-white shadow-md ring-2 ring-orange-300 font-extrabold scale-105'
+                  : 'bg-white/10 hover:bg-white/20 text-slate-200 border border-white/15'
+              }`}
+            >
+              ⛅ Tarde (PM)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setBloqueSeleccionado('NOCHE')
+                inputRef.current?.focus()
+              }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                bloqueSeleccionado === 'NOCHE'
+                  ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-400 font-extrabold scale-105'
+                  : 'bg-white/10 hover:bg-white/20 text-slate-200 border border-white/15'
+              }`}
+            >
+              🌙 Noche
+            </button>
+          </div>
 
           {/* Formulario de Escaneo con Autofoco Blindado */}
           <form onSubmit={handleEscaneo} className="max-w-xl mx-auto pt-2">
@@ -578,6 +648,7 @@ export default function ControlAsistenciaCliente({
                 <th className="px-5 py-3.5">Hora de Ingreso</th>
                 <th className="px-5 py-3.5">Estudiante</th>
                 <th className="px-5 py-3.5">Evento</th>
+                <th className="px-5 py-3.5">Jornada</th>
                 <th className="px-5 py-3.5">Asignatura Bonificación</th>
                 <th className="px-5 py-3.5">Método</th>
                 <th className="px-5 py-3.5">Validado Por</th>
@@ -586,7 +657,7 @@ export default function ControlAsistenciaCliente({
             <tbody className="divide-y divide-slate-100">
               {historial.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
                     <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                     <p className="font-semibold text-slate-600 text-sm">
                       Aún no hay asistencias registradas en esta sesión
@@ -624,6 +695,28 @@ export default function ControlAsistenciaCliente({
 
                     <td className="px-5 py-3.5 max-w-xs truncate text-slate-800 font-medium">
                       {item.inscripcion.evento.titulo}
+                    </td>
+
+                    <td className="px-5 py-3.5">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
+                          item.bloque === 'MANANA'
+                            ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                            : item.bloque === 'TARDE'
+                            ? 'bg-orange-100 text-orange-800 border border-orange-200'
+                            : item.bloque === 'NOCHE'
+                            ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                            : 'bg-slate-100 text-slate-700 border border-slate-200'
+                        }`}
+                      >
+                        {item.bloque === 'MANANA'
+                          ? '☀️ Mañana (AM)'
+                          : item.bloque === 'TARDE'
+                          ? '⛅ Tarde (PM)'
+                          : item.bloque === 'NOCHE'
+                          ? '🌙 Noche'
+                          : 'Única'}
+                      </span>
                     </td>
 
                     <td className="px-5 py-3.5">
