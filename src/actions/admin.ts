@@ -254,12 +254,16 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
       fuentePersonalizadaNombre = null
     }
 
+    const programasIds = formData
+      .getAll('programas_ids')
+      .map((v) => String(v).trim())
+      .filter(Boolean)
+
     let programaAcademico =
       (formData.get('programa_academico') as string)?.trim() || 'Facultad de Ingenierías'
 
     // Guarda de seguridad Multi-Tenancy:
-    // Si el usuario es ADMIN, el evento debe guardarse forzosamente con el programa académico de su sesión,
-    // sobrescribiendo cualquier otro valor que intente enviar desde el formulario.
+    // Si el usuario es ADMIN, asegurar que su propio programa esté incluido
     if (session.rol === RolUsuario.ADMIN) {
       if (!session.carrera?.trim()) {
         return {
@@ -267,7 +271,22 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
           error: 'No tienes un programa académico asignado a tu cuenta para crear eventos. Contacta al Súper Administrador.',
         }
       }
-      programaAcademico = session.carrera.trim()
+      const adminProg = await prisma.programa.findFirst({
+        where: { nombre: { equals: session.carrera.trim(), mode: 'insensitive' } },
+      })
+      if (adminProg && !programasIds.includes(adminProg.id)) {
+        programasIds.push(adminProg.id)
+      }
+    }
+
+    if (programasIds.length > 0) {
+      const progs = await prisma.programa.findMany({
+        where: { id: { in: programasIds } },
+        select: { nombre: true },
+      })
+      if (progs.length > 0) {
+        programaAcademico = progs.map((p) => p.nombre).join(', ')
+      }
     }
 
     await prisma.evento.create({
@@ -315,6 +334,9 @@ export async function crearEvento(formData: FormData): Promise<ActionResult> {
         nombre_firmante_2: nombreFirmante2,
         cargo_firmante_2: cargoFirmante2,
         programa_academico: programaAcademico,
+        programas: {
+          connect: programasIds.map((id) => ({ id })),
+        },
         organizadorId: session?.id || '',
       } as any,
     })
@@ -412,12 +434,17 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
       }
       const eventoActual = await prisma.evento.findUnique({
         where: { id: eventoId },
-        select: { programa_academico: true },
+        select: {
+          programa_academico: true,
+          programas: { select: { id: true, nombre: true } },
+        },
       })
-      if (
-        eventoActual &&
-        eventoActual.programa_academico !== session.carrera.trim()
-      ) {
+      const carreraAdmin = session.carrera.trim().toLowerCase()
+      const perteneceAEvento =
+        eventoActual?.programas.some((p) => p.nombre.toLowerCase() === carreraAdmin) ||
+        eventoActual?.programa_academico?.toLowerCase().includes(carreraAdmin)
+
+      if (eventoActual && !perteneceAEvento) {
         return {
           success: false,
           error: `No tienes permisos para modificar eventos fuera de tu programa académico (${session.carrera}).`,
@@ -502,6 +529,31 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
       fuentePersonalizadaNombre = null
     }
 
+    const programasIds = formData
+      .getAll('programas_ids')
+      .map((v) => String(v).trim())
+      .filter(Boolean)
+
+    if (session.rol === RolUsuario.ADMIN && session.carrera) {
+      const adminProg = await prisma.programa.findFirst({
+        where: { nombre: { equals: session.carrera.trim(), mode: 'insensitive' } },
+      })
+      if (adminProg && !programasIds.includes(adminProg.id)) {
+        programasIds.push(adminProg.id)
+      }
+    }
+
+    let nuevoProgramaAcademico: string | undefined = undefined
+    if (programasIds.length > 0) {
+      const progs = await prisma.programa.findMany({
+        where: { id: { in: programasIds } },
+        select: { nombre: true },
+      })
+      if (progs.length > 0) {
+        nuevoProgramaAcademico = progs.map((p) => p.nombre).join(', ')
+      }
+    }
+
     await prisma.evento.update({
       where: { id: eventoId },
       data: {
@@ -546,6 +598,10 @@ export async function actualizarEvento(formData: FormData): Promise<ActionResult
         firma_director_url: firmaDirectorUrl,
         nombre_firmante_2: nombreFirmante2,
         cargo_firmante_2: cargoFirmante2,
+        ...(nuevoProgramaAcademico ? { programa_academico: nuevoProgramaAcademico } : {}),
+        programas: {
+          set: programasIds.map((id) => ({ id })),
+        },
       } as any,
     })
 
@@ -580,12 +636,17 @@ export async function eliminarEvento(eventoId: string): Promise<ActionResult> {
       }
       const eventoActual = await prisma.evento.findUnique({
         where: { id: eventoId },
-        select: { programa_academico: true },
+        select: {
+          programa_academico: true,
+          programas: { select: { id: true, nombre: true } },
+        },
       })
-      if (
-        eventoActual &&
-        eventoActual.programa_academico !== session.carrera.trim()
-      ) {
+      const carreraAdmin = session.carrera.trim().toLowerCase()
+      const perteneceAEvento =
+        eventoActual?.programas.some((p) => p.nombre.toLowerCase() === carreraAdmin) ||
+        eventoActual?.programa_academico?.toLowerCase().includes(carreraAdmin)
+
+      if (eventoActual && !perteneceAEvento) {
         return {
           success: false,
           error: `No tienes permisos para eliminar eventos fuera de tu programa académico (${session.carrera}).`,

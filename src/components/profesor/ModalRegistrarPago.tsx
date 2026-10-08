@@ -28,6 +28,7 @@ export interface InscripcionData {
     titulo: string
     precio: number
     fechaInicio: Date | string
+    programas?: Array<{ id: string; nombre: string }>
   }
   usuario: {
     id: string

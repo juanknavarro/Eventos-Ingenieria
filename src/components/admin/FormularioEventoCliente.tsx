@@ -63,6 +63,7 @@ interface EventoInicial {
   nombre_firmante_2?: string | null
   cargo_firmante_2?: string | null
   programa_academico?: string | null
+  programas?: Array<{ id: string; nombre: string }> | null
   // Estilos visuales y tipografía dinámica (Diploma)
   fuente_certificado?: string | null
   fuente_catalogo_id?: string | null
@@ -141,6 +142,34 @@ export default function FormularioEventoCliente({
   const [colorCarreraEsc, setColorCarreraEsc] = useState(eventoInicial?.color_carrera_escarapela || '#526176')
   const [colorFondoRolEsc, setColorFondoRolEsc] = useState(eventoInicial?.color_fondo_rol_escarapela || '#D2202E')
   const [colorTextoRolEsc, setColorTextoRolEsc] = useState(eventoInicial?.color_texto_rol_escarapela || '#FFFFFF')
+
+  // Programas asignados para soporte colaborativo multi-carrera
+  const [programasSeleccionados, setProgramasSeleccionados] = useState<string[]>(() => {
+    if (eventoInicial?.programas && eventoInicial.programas.length > 0) {
+      return eventoInicial.programas.map((p) => p.id)
+    }
+    if (eventoInicial?.programa_academico) {
+      const match = programas
+        .filter((p) =>
+          eventoInicial.programa_academico!.toLowerCase().includes(p.nombre.toLowerCase())
+        )
+        .map((p) => p.id)
+      if (match.length > 0) return match
+    }
+    if (programaUsuario) {
+      const match = programas.find(
+        (p) => p.nombre.toLowerCase() === programaUsuario.toLowerCase()
+      )
+      if (match) return [match.id]
+    }
+    return []
+  })
+
+  const togglePrograma = (id: string) => {
+    setProgramasSeleccionados((prev) =>
+      prev.includes(id) ? prev.filter((pId) => pId !== id) : [...prev, id]
+    )
+  }
 
   // Paletas de color extraídas de las plantillas gráficas
   const [paletaDiploma, setPaletaDiploma] = useState<string[]>([])
@@ -625,49 +654,80 @@ export default function FormularioEventoCliente({
               </div>
             </div>
 
-            {/* Programa Académico (Multi-Tenancy) */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                <GraduationCap className="w-3.5 h-3.5 text-[#0B305B]" />
-                Programa Académico Asignado *
+            {/* Programas Académicos (Multi-Tenancy y Eventos Colaborativos) */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <GraduationCap className="w-3.5 h-3.5 text-[#0B305B]" />
+                  Programas Académicos Participantes (Colaborativos) *
+                </span>
+                <span className="text-[10px] font-semibold text-slate-500">
+                  {programasSeleccionados.length}{' '}
+                  {programasSeleccionados.length === 1 ? 'programa' : 'programas'} seleccionados
+                </span>
               </label>
-              {esSuperAdmin ? (
-                <select
-                  name="programa_academico"
-                  defaultValue={eventoInicial?.programa_academico || 'Facultad de Ingenierías'}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-bold text-slate-800 outline-none transition cursor-pointer"
-                >
-                  <option value="Facultad de Ingenierías">Facultad de Ingenierías (General / Todas)</option>
+
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Marca todos los programas académicos participantes. Los docentes de cada carrera seleccionada podrán ver el evento y gestionar a los alumnos de su propio programa.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 max-h-48 overflow-y-auto pr-1">
                   {programas && programas.length > 0 ? (
-                    programas.map((p) => (
-                      <option key={p.id} value={p.nombre}>
-                        {p.nombre}
-                      </option>
-                    ))
+                    programas.map((p) => {
+                      const isChecked = programasSeleccionados.includes(p.id)
+                      const esProgramaBaseUsuario =
+                        !esSuperAdmin &&
+                        !!programaUsuario &&
+                        p.nombre.toLowerCase() === programaUsuario.toLowerCase()
+
+                      return (
+                        <label
+                          key={p.id}
+                          className={`flex items-start gap-2.5 p-2 rounded-lg border text-xs font-bold cursor-pointer transition select-none ${
+                            isChecked
+                              ? 'bg-[#0B305B]/5 border-[#0B305B] text-[#0B305B]'
+                              : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            name="programas_ids"
+                            value={p.id}
+                            checked={isChecked}
+                            onChange={() => togglePrograma(p.id)}
+                            className="mt-0.5 rounded border-slate-300 text-[#0B305B] focus:ring-[#0B305B] w-4 h-4 cursor-pointer"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <span className="block truncate">{p.nombre}</span>
+                            {esProgramaBaseUsuario && (
+                              <span className="inline-block text-[9px] font-extrabold text-[#D2202E] uppercase">
+                                Tu Programa Asignado
+                              </span>
+                            )}
+                          </div>
+                        </label>
+                      )
+                    })
                   ) : (
-                    <>
-                      <option value="Ingeniería de Sistemas">Ingeniería de Sistemas</option>
-                      <option value="Ingeniería Industrial">Ingeniería Industrial</option>
-                      <option value="Ingeniería Civil">Ingeniería Civil</option>
-                      <option value="Ingeniería Electromecánica">Ingeniería Electromecánica</option>
-                      <option value="Ingeniería de Software y Tecnologías Emergentes">Ingeniería de Software y Tecnologías Emergentes</option>
-                    </>
+                    <div className="text-xs text-slate-500 py-1 col-span-2">
+                      No hay programas registrados en la plataforma.
+                    </div>
                   )}
-                </select>
-              ) : (
-                <div>
-                  <input
-                    type="text"
-                    name="programa_academico"
-                    defaultValue={eventoInicial?.programa_academico || programaUsuario || 'Facultad de Ingenierías'}
-                    readOnly
-                    className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none cursor-not-allowed"
-                  />
-                  <span className="text-[10px] text-slate-400">
-                    Asignado a tu programa académico ({programaUsuario || 'Departamento'})
-                  </span>
                 </div>
-              )}
+              </div>
+
+              {/* Sincronización oculta de texto para retrocompatibilidad */}
+              <input
+                type="hidden"
+                name="programa_academico"
+                value={
+                  programas
+                    .filter((p) => programasSeleccionados.includes(p.id))
+                    .map((p) => p.nombre)
+                    .join(', ') || 'Facultad de Ingenierías'
+                }
+              />
             </div>
 
             {/* Estado del Evento */}

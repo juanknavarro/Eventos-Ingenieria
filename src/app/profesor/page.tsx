@@ -38,6 +38,9 @@ export default async function ProfesorAdminPage() {
         titulo: true,
         precio: true,
         fechaInicio: true,
+        programas: {
+          select: { id: true, nombre: true },
+        },
       },
       orderBy: { fechaInicio: 'asc' },
     }),
@@ -60,6 +63,9 @@ export default async function ProfesorAdminPage() {
             titulo: true,
             precio: true,
             fechaInicio: true,
+            programas: {
+              select: { id: true, nombre: true },
+            },
           },
         },
       },

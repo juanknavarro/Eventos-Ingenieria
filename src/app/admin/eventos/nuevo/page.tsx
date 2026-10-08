@@ -29,7 +29,7 @@ export default async function NuevoEventoPage({ searchParams }: Props) {
     id
       ? prisma.evento.findUnique({
           where: { id },
-          include: { organizador: true, fuenteCatalogo: true },
+          include: { organizador: true, fuenteCatalogo: true, programas: true },
         })
       : Promise.resolve(null),
     prisma.programa.findMany({
@@ -45,10 +45,13 @@ export default async function NuevoEventoPage({ searchParams }: Props) {
 
   // Validar pertenencia si es ADMIN de programa
   if (eventoInicial && !esSuperAdmin(session) && session.carrera) {
-    if (
-      eventoInicial.programa_academico !== session.carrera &&
-      !eventoInicial.organizador?.carrera?.toLowerCase().includes(session.carrera.toLowerCase())
-    ) {
+    const carreraAdmin = session.carrera.toLowerCase().trim()
+    const pertenece =
+      eventoInicial.programas?.some((p: any) => p.nombre.toLowerCase() === carreraAdmin) ||
+      eventoInicial.programa_academico?.toLowerCase().includes(carreraAdmin) ||
+      eventoInicial.organizador?.carrera?.toLowerCase().includes(carreraAdmin)
+
+    if (!pertenece) {
       redirect('/admin?error=acceso_denegado_evento')
     }
   }

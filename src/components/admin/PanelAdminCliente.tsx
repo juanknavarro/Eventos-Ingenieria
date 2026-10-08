@@ -67,6 +67,7 @@ interface EventoData {
   imagen_central_url: string | null
   sponsors_url: string | null
   programa_academico?: string | null
+  programas?: Array<{ id: string; nombre: string }> | null
   _count?: {
     inscripciones: number
   }
@@ -305,10 +306,12 @@ export default function PanelAdminCliente({
   // Filtrar eventos por programa académico seleccionado
   const eventosFiltrados = useMemo(() => {
     if (programaSeleccionado === 'todos') return eventos
+    const progSel = programaSeleccionado.toLowerCase()
     return eventos.filter(
       (e) =>
-        e.programa_academico?.toLowerCase().includes(programaSeleccionado.toLowerCase()) ||
-        e.titulo?.toLowerCase().includes(programaSeleccionado.toLowerCase())
+        e.programas?.some((p) => p.nombre.toLowerCase().includes(progSel)) ||
+        e.programa_academico?.toLowerCase().includes(progSel) ||
+        e.titulo?.toLowerCase().includes(progSel)
     )
   }, [eventos, programaSeleccionado])
 
@@ -1661,8 +1664,12 @@ export default function PanelAdminCliente({
                     </option>
                     {eventos
                       .filter((ev) => {
-                        if (!esSuperAdmin && adminActual.carrera && ev.programa_academico) {
-                          return ev.programa_academico === adminActual.carrera
+                        if (!esSuperAdmin && adminActual.carrera) {
+                          const carreraAdmin = adminActual.carrera.toLowerCase()
+                          return (
+                            ev.programas?.some((p) => p.nombre.toLowerCase().includes(carreraAdmin)) ||
+                            ev.programa_academico?.toLowerCase().includes(carreraAdmin)
+                          )
                         }
                         return true
                       })
@@ -1833,8 +1840,12 @@ export default function PanelAdminCliente({
                     <option value="">-- Sin evento asignado (Inhabilitado) --</option>
                     {eventos
                       .filter((ev) => {
-                        if (!esSuperAdmin && adminActual.carrera && ev.programa_academico) {
-                          return ev.programa_academico === adminActual.carrera
+                        if (!esSuperAdmin && adminActual.carrera) {
+                          const carreraAdmin = adminActual.carrera.toLowerCase()
+                          return (
+                            ev.programas?.some((p) => p.nombre.toLowerCase().includes(carreraAdmin)) ||
+                            ev.programa_academico?.toLowerCase().includes(carreraAdmin)
+                          )
                         }
                         return true
                       })

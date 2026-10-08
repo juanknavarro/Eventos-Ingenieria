@@ -39,7 +39,24 @@ export function filtroEventosPorTenancy(session: AuthSessionUser): Prisma.Evento
   }
 
   return {
-    programa_academico: programa,
+    OR: [
+      {
+        programas: {
+          some: {
+            nombre: {
+              equals: programa,
+              mode: 'insensitive',
+            },
+          },
+        },
+      },
+      {
+        programa_academico: {
+          contains: programa,
+          mode: 'insensitive',
+        },
+      },
+    ],
   }
 }
 
@@ -69,7 +86,9 @@ export function filtroUsuariosPorTenancy(session: AuthSessionUser): Prisma.Usuar
 /**
  * Filtro de Inscripciones y Recaudos Financieros por Multi-Tenancy
  * - SUPER_ADMIN: Visión global de todas las inscripciones.
- * - ADMIN / PROFESOR / STAFF: Inscripciones de estudiantes de su carrera, o eventos de su carrera, o pagos a cargo de docentes de su carrera.
+ * - ADMIN / PROFESOR / STAFF: Garantiza el aislamiento en eventos colaborativos;
+ *   el docente solo ve/gestiona alumnos cuyo usuario.carrera coincida con su programa
+ *   o pagos expresamente a su cargo.
  */
 export function filtroInscripcionesPorTenancy(session: AuthSessionUser): Prisma.InscripcionWhereInput {
   if (session.rol === RolUsuario.SUPER_ADMIN) {
@@ -84,8 +103,17 @@ export function filtroInscripcionesPorTenancy(session: AuthSessionUser): Prisma.
   return {
     OR: [
       { usuario: { carrera: { contains: programa, mode: 'insensitive' } } },
-      { evento: { programa_academico: programa } },
+      { profesorResponsableId: session.id },
       { profesorResponsable: { carrera: { contains: programa, mode: 'insensitive' } } },
+      {
+        evento: {
+          OR: [
+            { programas: { some: { nombre: { equals: programa, mode: 'insensitive' } } } },
+            { programa_academico: { contains: programa, mode: 'insensitive' } },
+          ],
+        },
+        usuario: { carrera: { contains: programa, mode: 'insensitive' } },
+      },
     ],
   }
 }

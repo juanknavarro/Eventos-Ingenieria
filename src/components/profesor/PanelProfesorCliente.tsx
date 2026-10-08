@@ -37,6 +37,7 @@ export interface EventoOption {
   titulo: string
   precio: number
   fechaInicio: Date | string
+  programas?: Array<{ id: string; nombre: string }>
 }
 
 interface PanelProfesorClienteProps {

@@ -45,6 +45,9 @@ export default async function AdminPage() {
         _count: {
           select: { inscripciones: true },
         },
+        programas: {
+          select: { id: true, nombre: true },
+        },
       },
     }),
     prisma.usuario.findMany({
@@ -77,7 +80,9 @@ export default async function AdminPage() {
         evento: {
           select: {
             programa_academico: true,
-            programaId: true,
+            programas: {
+              select: { id: true, nombre: true },
+            },
           },
         },
       },

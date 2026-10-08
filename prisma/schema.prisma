@@ -154,8 +154,7 @@ model Evento {
   estilo_etiqueta_rol          String?  @default("SOLIDO") // 'SOLIDO' | 'CONTORNO_CURVO' | 'TEXTO_LIBRE'
 
   programa_academico   String?      @default("Facultad de Ingenierías") // Programa académico (Multi-Tenancy)
-  programaId           String?
-  programa             Programa?    @relation(fields: [programaId], references: [id], onDelete: SetNull)
+  programas            Programa[]   @relation("EventosProgramas")
   asistenciasMinimas   Int          @default(1)
   organizadorId        String
   createdAt            DateTime     @default(now())
@@ -285,7 +284,7 @@ model Programa {
 
   // Relaciones formales
   usuarios      Usuario[]
-  eventos       Evento[]
+  eventos       Evento[]     @relation("EventosProgramas")
   asignaturas   Asignatura[]
 
   @@map("programas")
