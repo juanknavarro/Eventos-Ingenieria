@@ -17,6 +17,11 @@ export default async function ProfesorLayout({
     redirect('/login?error=no_autenticado')
   }
 
+  // Si tiene cambio de clave pendiente, forzar a /cambiar-password
+  if (session.debeCambiarPassword) {
+    redirect('/cambiar-password')
+  }
+
   const tieneAcceso =
     session.rol === RolUsuario.PROFESOR ||
     session.rol === RolUsuario.ADMIN ||

@@ -18,6 +18,11 @@ export default async function AdminLayout({
     redirect('/login?error=no_autenticado')
   }
 
+  // Si tiene cambio de clave pendiente, forzar a /cambiar-password
+  if (session.debeCambiarPassword) {
+    redirect('/cambiar-password')
+  }
+
   if (!esAdminOSuperior(session)) {
     if (session.rol === RolUsuario.PROFESOR) {
       redirect('/profesor?error=acceso_denegado_admin')

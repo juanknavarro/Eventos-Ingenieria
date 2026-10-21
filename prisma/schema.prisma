@@ -87,6 +87,8 @@ model Usuario {
   departamento      String?
   ciudad            String?
 
+  debeCambiarPassword Boolean        @default(false)
+
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
 
@@ -98,6 +100,7 @@ model Usuario {
   inscripcionesComoProfesor  Inscripcion[] @relation("ProfesorResponsable")
   asistenciasRegistradas     Asistencia[]  @relation("StaffRegistroAsistencia")
   fuentesSubidas             CatalogoFuente[]
+  tutorialesCreados          Tutorial[]    @relation("AutorTutorial")
 
   @@map("usuarios")
 }
@@ -308,3 +311,23 @@ model CatalogoFuente {
 
   @@map("catalogo_fuentes")
 }
+
+// Módulo de Tutoriales y Guías Institucionales
+model Tutorial {
+  id           String    @id @default(cuid())
+  titulo       String
+  categoria    String    // Ej: "Gestión de Eventos", "Control de Asistencia", "Validación de Recaudos", "Certificados"
+  descripcion  String    @db.Text
+  youtubeUrl   String?
+  orden        Int       @default(0)
+  activo       Boolean   @default(true)
+
+  creadoPorId  String?
+  creadoPor    Usuario?  @relation("AutorTutorial", fields: [creadoPorId], references: [id], onDelete: SetNull)
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("tutoriales")
+}
+

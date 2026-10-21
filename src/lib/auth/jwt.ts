@@ -11,6 +11,7 @@ export interface AuthSessionUser {
   rol: RolUsuarioEnum
   carrera: string | null
   codigoEstudiantil: string | null
+  debeCambiarPassword: boolean
 }
 
 function getJwtSecret(): Uint8Array {
@@ -31,6 +32,7 @@ export async function signJwtSession(user: AuthSessionUser): Promise<string> {
     rol: user.rol,
     carrera: user.carrera,
     codigoEstudiantil: user.codigoEstudiantil,
+    debeCambiarPassword: user.debeCambiarPassword ?? false,
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -60,6 +62,7 @@ export async function verifyJwtSession(token: string): Promise<AuthSessionUser |
       rol: payload.rol as RolUsuarioEnum,
       carrera: (payload.carrera as string) || null,
       codigoEstudiantil: (payload.codigoEstudiantil as string) || null,
+      debeCambiarPassword: Boolean(payload.debeCambiarPassword),
     }
   } catch {
     return null

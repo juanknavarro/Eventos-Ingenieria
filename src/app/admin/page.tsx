@@ -11,6 +11,7 @@ import {
   Award,
   ExternalLink,
   Building2,
+  HelpCircle,
 } from 'lucide-react'
 
 import { obtenerConfiguracionPlantillas } from '@/lib/config/plantillas'
@@ -119,65 +120,75 @@ export default async function AdminPage() {
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-16">
       {/* Header Institucional Corporativo */}
       <header className="bg-[#0B305B] text-white border-b-4 border-[#D2202E] sticky top-0 z-40 shadow-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/20">
-              <ShieldCheck className="w-6 h-6 text-[#D2202E]" />
+        <div className="max-w-7xl 2xl:max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col xl:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/20 shrink-0">
+              <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6 text-[#D2202E]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-extrabold px-2 py-0.5 rounded bg-[#D2202E] text-white uppercase tracking-wider">
+                <span className="text-[10px] sm:text-[11px] font-extrabold px-2 py-0.5 rounded bg-[#D2202E] text-white uppercase tracking-wider">
                   Panel Maestro
                 </span>
                 <span className="text-xs text-slate-300 font-semibold">
                   Universidad del Sinú
                 </span>
               </div>
-              <h1 className="text-base font-bold tracking-tight text-white">
+              <h1 className="text-sm sm:text-base font-bold tracking-tight text-white whitespace-nowrap">
                 Administración General &bull; Facultad de Ingenierías
               </h1>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            {esSuperAdmin(session) && (
+          <div className="flex items-center justify-between xl:justify-end gap-2 w-full xl:w-auto overflow-x-auto py-0.5 flex-nowrap scrollbar-none">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-nowrap shrink-0">
+              {esSuperAdmin(session) && (
+                <Link
+                  href="/admin/programas"
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#D2202E] hover:bg-[#B01824] text-white transition flex items-center gap-1.5 shadow-xs cursor-pointer whitespace-nowrap shrink-0"
+                >
+                  <Building2 className="w-3.5 h-3.5" />
+                  <span>Gestionar Programas</span>
+                </Link>
+              )}
+
               <Link
-                href="/admin/programas"
-                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#D2202E] hover:bg-[#B01824] text-white transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                href="/admin/tutoriales"
+                className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#D2202E]/80 hover:bg-[#D2202E] text-white transition flex items-center gap-1.5 shadow-xs cursor-pointer whitespace-nowrap shrink-0"
               >
-                <Building2 className="w-3.5 h-3.5" />
-                Gestionar Programas
+                <HelpCircle className="w-3.5 h-3.5" />
+                <span>Tutoriales / Ayuda</span>
               </Link>
-            )}
 
-            <Link
-              href="/profesor"
-              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 hover:bg-white/20 text-white transition flex items-center gap-1.5"
-            >
-              <GraduationCap className="w-3.5 h-3.5 text-blue-300" />
-              Gestión Docente (Pagos)
-            </Link>
+              <Link
+                href="/profesor"
+                className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-white/10 hover:bg-white/20 text-white transition flex items-center gap-1.5 whitespace-nowrap shrink-0"
+              >
+                <GraduationCap className="w-3.5 h-3.5 text-blue-300" />
+                <span>Gestión Docente (Pagos)</span>
+              </Link>
 
-            <Link
-              href="/staff/asistencia"
-              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 hover:bg-white/20 text-white transition flex items-center gap-1.5"
-            >
-              <Award className="w-3.5 h-3.5 text-emerald-300" />
-              Control en Puerta
-            </Link>
+              <Link
+                href="/staff/asistencia"
+                className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-white/10 hover:bg-white/20 text-white transition flex items-center gap-1.5 whitespace-nowrap shrink-0"
+              >
+                <Award className="w-3.5 h-3.5 text-emerald-300" />
+                <span>Control en Puerta</span>
+              </Link>
 
-            <Link
-              href="/certificados"
-              target="_blank"
-              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 hover:bg-white/20 text-white transition flex items-center gap-1.5"
-            >
-              <ExternalLink className="w-3.5 h-3.5" />
-              Certificados
-            </Link>
+              <Link
+                href="/certificados"
+                target="_blank"
+                className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-white/10 hover:bg-white/20 text-white transition flex items-center gap-1.5 whitespace-nowrap shrink-0"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Certificados</span>
+              </Link>
+            </div>
 
-            <div className="h-5 w-px bg-white/20 mx-1"></div>
-
-            <BotonCerrarSesion />
+            <div className="flex items-center gap-1 shrink-0 pl-1 border-l border-white/20 ml-1">
+              <BotonCerrarSesion className="text-white/80 hover:text-white hover:bg-white/10 whitespace-nowrap shrink-0" />
+            </div>
           </div>
         </div>
       </header>

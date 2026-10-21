@@ -17,6 +17,11 @@ export default async function StaffLayout({
     redirect('/login?error=no_autenticado')
   }
 
+  // Si tiene cambio de clave pendiente, forzar a /cambiar-password
+  if (session.debeCambiarPassword) {
+    redirect('/cambiar-password')
+  }
+
   const tieneAcceso =
     session.rol === RolUsuario.STAFF ||
     session.rol === RolUsuario.ADMIN ||

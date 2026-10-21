@@ -1,7 +1,7 @@
 import prisma from '@/lib/prisma'
 import PanelProfesorCliente from '@/components/profesor/PanelProfesorCliente'
 import Link from 'next/link'
-import { ArrowLeft, GraduationCap, ShieldCheck, ScanBarcode } from 'lucide-react'
+import { ArrowLeft, GraduationCap, ShieldCheck, ScanBarcode, HelpCircle } from 'lucide-react'
 import { RolUsuario } from '@prisma/client'
 import { getAuthSession } from '@/lib/auth/session'
 import BotonCerrarSesion from '@/components/auth/BotonCerrarSesion'
@@ -107,6 +107,14 @@ export default async function ProfesorAdminPage() {
           </div>
 
           <div className="flex items-center gap-2.5">
+            <Link
+              href="/profesor/tutoriales"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-[#0B305B] bg-[#F0F4F9] hover:bg-[#E2EAF4] border border-[#C2D3E7] shadow-sm transition"
+            >
+              <HelpCircle className="w-3.5 h-3.5 text-[#D2202E]" />
+              Tutoriales / Ayuda
+            </Link>
+
             {sesion?.rol === 'ADMIN' && (
               <>
                 <Link

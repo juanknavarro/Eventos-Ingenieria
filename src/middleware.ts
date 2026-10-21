@@ -10,8 +10,9 @@ export async function middleware(request: NextRequest) {
   const esRutaAdmin = pathname === '/admin' || pathname.startsWith('/admin/')
   const esRutaProfesor = pathname === '/profesor' || pathname.startsWith('/profesor/')
   const esRutaStaff = pathname === '/staff' || pathname.startsWith('/staff/')
+  const esRutaCambiarPassword = pathname === '/cambiar-password' || pathname.startsWith('/cambiar-password/')
 
-  if (!esRutaAdmin && !esRutaProfesor && !esRutaStaff) {
+  if (!esRutaAdmin && !esRutaProfesor && !esRutaStaff && !esRutaCambiarPassword) {
     return NextResponse.next()
   }
 
@@ -30,6 +31,25 @@ export async function middleware(request: NextRequest) {
       response.cookies.delete(AUTH_COOKIE_NAME)
     }
     return response
+  }
+
+  // 4. Intercepción de Cambio de Contraseña Obligatorio
+  // Si debe cambiar clave y está intentando acceder a cualquier otra ruta protegida
+  if (sessionUser.debeCambiarPassword && !esRutaCambiarPassword) {
+    return NextResponse.redirect(new URL('/cambiar-password', request.url))
+  }
+
+  // Si ya no debe cambiar clave e intenta ingresar a /cambiar-password, redirigir a su dashboard
+  if (!sessionUser.debeCambiarPassword && esRutaCambiarPassword) {
+    let dashboard = '/'
+    if (sessionUser.rol === 'SUPER_ADMIN' || sessionUser.rol === 'ADMIN') dashboard = '/admin'
+    else if (sessionUser.rol === 'PROFESOR') dashboard = '/profesor'
+    else if (sessionUser.rol === 'STAFF') dashboard = '/staff/asistencia'
+    return NextResponse.redirect(new URL(dashboard, request.url))
+  }
+
+  if (esRutaCambiarPassword) {
+    return NextResponse.next()
   }
 
   const { rol } = sessionUser
@@ -85,7 +105,7 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next()
 }
 
-// Matcher exclusivo para rutas del personal interno
+// Matcher exclusivo para rutas del personal interno y cambio obligatorio de clave
 export const config = {
   matcher: [
     '/admin',
@@ -94,5 +114,7 @@ export const config = {
     '/profesor/:path*',
     '/staff',
     '/staff/:path*',
+    '/cambiar-password',
+    '/cambiar-password/:path*',
   ],
 }

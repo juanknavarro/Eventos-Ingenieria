@@ -778,6 +778,7 @@ export async function registrarPersonal(formData: FormData): Promise<ActionResul
         carrera,
         rol,
         passwordHash,
+        debeCambiarPassword: true,
         eventoAsignadoId: rol === RolUsuario.STAFF ? eventoAsignadoId : null,
       },
     })
