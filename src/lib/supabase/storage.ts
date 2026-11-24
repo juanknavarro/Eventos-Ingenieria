@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import prisma from '@/lib/prisma'
 import fs from 'fs'
 import path from 'path'
@@ -6,7 +6,8 @@ import path from 'path'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://crhgebheptqlnwkupnvb.supabase.co'
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
-export const supabaseStorage = createClient(supabaseUrl, supabaseKey)
+export const supabaseStorage: SupabaseClient | null =
+  supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null
 
 export const BUCKET_RECURSOS = 'recursos_eventos'
 
@@ -14,8 +15,8 @@ export const BUCKET_RECURSOS = 'recursos_eventos'
  * Asegura que el bucket recursos_eventos exista y sea público en Supabase Storage
  */
 export async function asegurarBucketRecursosEventos() {
+  if (!supabaseStorage) return
   try {
-    // 1. Intentar mediante la base de datos relacional de Supabase (100% confiable)
     await prisma.$executeRawUnsafe(`
       INSERT INTO storage.buckets (id, name, public)
       VALUES ('${BUCKET_RECURSOS}', '${BUCKET_RECURSOS}', true)
@@ -27,17 +28,14 @@ export async function asegurarBucketRecursosEventos() {
 }
 
 /**
- * Sube un archivo de imagen al bucket recursos_eventos de Supabase Storage.
- * Si las credenciales API de Supabase son un placeholder temporal, guarda como contingencia
- * en public/uploads/ para garantizar que la plataforma nunca se interrumpa.
+ * Sube un archivo de imagen a Supabase Storage (si está configurado)
+ * o directamente en public/uploads/ en entornos independientes (VPS).
  */
 export async function subirArchivoRecursosEventos(
   archivo: File,
   prefijo: string = 'evento'
 ): Promise<{ url: string; origen: 'supabase' | 'local'; error?: string }> {
   try {
-    await asegurarBucketRecursosEventos()
-
     const buffer = Buffer.from(await archivo.arrayBuffer())
     const extension = path.extname(archivo.name) || '.png'
     const nombreLimpio = archivo.name
@@ -46,29 +44,32 @@ export async function subirArchivoRecursosEventos(
       .toLowerCase()
     const nombreArchivo = `${prefijo}_${Date.now()}_${nombreLimpio}${extension}`
 
-    // 1. Intentar subir a Supabase Storage API
-    try {
-      const { data, error } = await supabaseStorage.storage
-        .from(BUCKET_RECURSOS)
-        .upload(nombreArchivo, buffer, {
-          contentType: archivo.type || 'image/png',
-          upsert: true,
-        })
+    // 1. Si hay credenciales de Supabase (Entorno Desarrollo), subir a Supabase Storage
+    if (supabaseStorage) {
+      await asegurarBucketRecursosEventos()
+      try {
+        const { data, error } = await supabaseStorage.storage
+          .from(BUCKET_RECURSOS)
+          .upload(nombreArchivo, buffer, {
+            contentType: archivo.type || 'image/png',
+            upsert: true,
+          })
 
-      if (!error && data) {
-        const {
-          data: { publicUrl },
-        } = supabaseStorage.storage.from(BUCKET_RECURSOS).getPublicUrl(nombreArchivo)
+        if (!error && data) {
+          const {
+            data: { publicUrl },
+          } = supabaseStorage.storage.from(BUCKET_RECURSOS).getPublicUrl(nombreArchivo)
 
-        return { url: publicUrl, origen: 'supabase' }
-      } else {
-        console.warn('Supabase Storage API respondió con error:', error?.message)
+          return { url: publicUrl, origen: 'supabase' }
+        } else {
+          console.warn('Supabase Storage API respondió con error:', error?.message)
+        }
+      } catch (apiErr) {
+        console.warn('Excepción al conectar con Supabase Storage API:', apiErr)
       }
-    } catch (apiErr) {
-      console.warn('Excepción al conectar con Supabase Storage API:', apiErr)
     }
 
-    // 2. Modo contingencia transparente: Guardar en public/uploads/
+    // 2. Almacenamiento local en disco (Entorno Producción VPS / Contingencia)
     const dirUploads = path.join(process.cwd(), 'public', 'uploads')
     if (!fs.existsSync(dirUploads)) {
       fs.mkdirSync(dirUploads, { recursive: true })
@@ -105,7 +106,7 @@ export async function eliminarArchivoRecursos(url?: string | null): Promise<bool
     }
 
     // 2. Si es de Supabase Storage
-    if (url.includes(BUCKET_RECURSOS)) {
+    if (supabaseStorage && url.includes(BUCKET_RECURSOS)) {
       const partes = url.split(`${BUCKET_RECURSOS}/`)
       if (partes.length > 1) {
         const nombreArchivo = decodeURIComponent(partes[1].split('?')[0])
@@ -118,5 +119,3 @@ export async function eliminarArchivoRecursos(url?: string | null): Promise<bool
   }
   return false
 }
-
-
