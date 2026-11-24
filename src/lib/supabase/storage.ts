@@ -37,7 +37,7 @@ export async function subirArchivoRecursosEventos(
 ): Promise<{ url: string; origen: 'supabase' | 'local'; error?: string }> {
   try {
     const buffer = Buffer.from(await archivo.arrayBuffer())
-    const extension = path.extname(archivo.name) || '.png'
+    const extension = (path.extname(archivo.name) || '.png').toLowerCase()
     const nombreLimpio = archivo.name
       .replace(extension, '')
       .replace(/[^a-zA-Z0-9_-]/g, '_')

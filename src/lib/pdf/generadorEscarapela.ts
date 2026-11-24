@@ -73,6 +73,27 @@ export function parsearHexARgb(hex?: string | null, fallback = rgb(0.043, 0.188,
 }
 
 /**
+ * Lee un archivo estático desde public/ en entorno servidor (Node.js) evitando fetch() con rutas relativas.
+ */
+async function leerBytesLocalesServidor(url: string): Promise<Uint8Array | null> {
+  if (typeof window !== 'undefined' || !url.startsWith('/')) return null
+
+  try {
+    const fs = await import(/* webpackIgnore: true */ 'fs')
+    const path = await import(/* webpackIgnore: true */ 'path')
+    const rutaPublic = path.join(process.cwd(), 'public', url.replace(/^\/+/, ''))
+    if (fs.existsSync(rutaPublic)) {
+      const buffer = fs.readFileSync(rutaPublic)
+      return new Uint8Array(buffer)
+    }
+  } catch (err) {
+    console.warn(`[PDF Engine] No se pudo leer el archivo local desde disco (${url}):`, err)
+  }
+
+  return null
+}
+
+/**
  * Carga e incrusta una imagen (PNG o JPG) de forma segura en el PDF
  * Compatible al 100% con ejecución en el navegador (Client Component) y en Node.js
  */
@@ -85,7 +106,9 @@ async function cargarEIncrustarImagen(
   try {
     let bytes: Uint8Array | null = null
 
-    if (typeof window !== 'undefined' || url.startsWith('http') || url.startsWith('/')) {
+    if (typeof window === 'undefined' && url.startsWith('/')) {
+      bytes = await leerBytesLocalesServidor(url)
+    } else if (typeof window !== 'undefined' || url.startsWith('http')) {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 6000)
       const resp = await fetch(url, { signal: controller.signal })
@@ -116,7 +139,7 @@ async function cargarEIncrustarImagen(
 
 /**
  * Carga e incrusta una tipografía personalizada (.ttf / .otf) de forma segura en el PDF.
- * Soporta URLs absolutas de Supabase, blob URLs en navegador y rutas relativas.
+ * Soporta URLs absolutas, blob URLs en navegador y rutas relativas (/uploads/...).
  * Si falla la descarga o lectura, retorna null para permitir fallback ininterrumpido a fuentes estándar.
  */
 async function cargarEIncrustarFuente(
@@ -130,7 +153,9 @@ async function cargarEIncrustarFuente(
 
     let bytes: Uint8Array | null = null
 
-    if (typeof window !== 'undefined' || url.startsWith('http') || url.startsWith('blob:') || url.startsWith('/')) {
+    if (typeof window === 'undefined' && url.startsWith('/')) {
+      bytes = await leerBytesLocalesServidor(url)
+    } else if (typeof window !== 'undefined' || url.startsWith('http') || url.startsWith('blob:')) {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 6000)
       const resp = await fetch(url, { signal: controller.signal })

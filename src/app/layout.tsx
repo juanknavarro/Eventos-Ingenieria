@@ -13,8 +13,37 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Gestión de Eventos | Facultad de Ingenierías',
-  description: 'Plataforma de gestión de eventos, inscripciones, bonificaciones académicas y asistencia',
+  metadataBase: new URL('https://eventos.ingenieriadigital.cloud'),
+  title: {
+    default: 'Gestión de Eventos | Facultad de Ingenierías',
+    template: '%s | Eventos Facultad de Ingenierías',
+  },
+  description:
+    'Plataforma oficial de gestión de eventos, inscripciones, bonificaciones académicas y control de asistencia de la Facultad de Ciencias e Ingenierías.',
+  openGraph: {
+    title: 'Gestión de Eventos | Facultad de Ingenierías',
+    description:
+      'Plataforma oficial de gestión de eventos, inscripciones, bonificaciones académicas y control de asistencia de la Facultad de Ciencias e Ingenierías.',
+    url: 'https://eventos.ingenieriadigital.cloud',
+    siteName: 'Eventos Facultad de Ingenierías',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'Eventos Facultad de Ingenierías',
+      },
+    ],
+    locale: 'es_CO',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Gestión de Eventos | Facultad de Ingenierías',
+    description:
+      'Plataforma oficial de gestión de eventos, inscripciones, bonificaciones académicas y control de asistencia de la Facultad de Ciencias e Ingenierías.',
+    images: ['/og-image.png'],
+  },
 }
 
 export default function RootLayout({
