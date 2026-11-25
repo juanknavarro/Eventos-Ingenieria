@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Users,
   DollarSign,
@@ -20,9 +21,14 @@ import {
   Check,
   Banknote,
   Landmark,
+  Loader2,
 } from 'lucide-react'
 import ModalRegistrarPago, { InscripcionData } from './ModalRegistrarPago'
-import { revertirPago } from '@/actions/pagos'
+import {
+  revertirPago,
+  registrarPago,
+  confirmarCuposGratuitosMasivo,
+} from '@/actions/pagos'
 
 export interface ProfesorUsuario {
   id: string
@@ -54,6 +60,7 @@ export default function PanelProfesorCliente({
   inscripcionesIniciales,
 }: PanelProfesorClienteProps) {
   // Datos del docente autenticado leídos exclusivamente de la sesión
+  const router = useRouter()
   const profesorActivo = docenteActual || profesores[0]
 
   // Filtros
@@ -67,9 +74,12 @@ export default function PanelProfesorCliente({
   const [inscripcionSeleccionada, setInscripcionSeleccionada] =
     useState<InscripcionData | null>(null)
 
-  // Mensaje Toast / Notificación
+  // Mensaje Toast / Notificación y estados de carga
   const [toastMensaje, setToastMensaje] = useState<string | null>(null)
   const [loadingRevertir, setLoadingRevertir] = useState<string | null>(null)
+  const [confirmandoGratuitoId, setConfirmandoGratuitoId] = useState<string | null>(null)
+  const [confirmandoMasivo, setConfirmandoMasivo] = useState<boolean>(false)
+  const [seleccionadosGratuitos, setSeleccionadosGratuitos] = useState<string[]>([])
 
   // Filtrar inscripciones
   const inscripcionesFiltradas = useMemo(() => {
@@ -165,11 +175,85 @@ export default function PanelProfesorCliente({
       if (res.success) {
         setToastMensaje(res.message || 'Pago revertido con éxito.')
         setTimeout(() => setToastMensaje(null), 5000)
+        router.refresh()
       } else {
         alert(res.error)
       }
     } finally {
       setLoadingRevertir(null)
+    }
+  }
+
+  // Inscripciones elegibles para habilitación gratuita masiva (PENDIENTE y evento.precio === 0)
+  const pendientesGratuitosVisibles = useMemo(
+    () =>
+      inscripcionesFiltradas.filter(
+        (i) => i.estado_pago === 'PENDIENTE' && i.evento.precio === 0
+      ),
+    [inscripcionesFiltradas]
+  )
+
+  const todosGratuitosSeleccionados =
+    pendientesGratuitosVisibles.length > 0 &&
+    pendientesGratuitosVisibles.every((i) => seleccionadosGratuitos.includes(i.id))
+
+  const toggleSeleccionarTodosGratuitos = () => {
+    if (todosGratuitosSeleccionados) {
+      const idsVisibles = new Set(pendientesGratuitosVisibles.map((i) => i.id))
+      setSeleccionadosGratuitos((prev) => prev.filter((id) => !idsVisibles.has(id)))
+    } else {
+      const nuevosIds = new Set([
+        ...seleccionadosGratuitos,
+        ...pendientesGratuitosVisibles.map((i) => i.id),
+      ])
+      setSeleccionadosGratuitos(Array.from(nuevosIds))
+    }
+  }
+
+  const toggleSeleccionarGratuito = (id: string) => {
+    setSeleccionadosGratuitos((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    )
+  }
+
+  const handleConfirmarCupoGratuito = async (ins: InscripcionData) => {
+    setConfirmandoGratuitoId(ins.id)
+    try {
+      const res = await registrarPago({
+        inscripcionId: ins.id,
+        montoRecibido: 0,
+        profesorNombre: profesorActivo?.nombre,
+      })
+      if (res.success) {
+        setSeleccionadosGratuitos((prev) => prev.filter((id) => id !== ins.id))
+        handlePagoCompletado(
+          res.message || `Cupo gratuito confirmado (EXENTO) para ${ins.usuario.nombre}.`
+        )
+        router.refresh()
+      } else {
+        alert(res.error || 'No se pudo confirmar el cupo gratuito.')
+      }
+    } finally {
+      setConfirmandoGratuitoId(null)
+    }
+  }
+
+  const handleConfirmarMasivoGratuitos = async () => {
+    if (seleccionadosGratuitos.length === 0 || confirmandoMasivo) return
+    setConfirmandoMasivo(true)
+    try {
+      const res = await confirmarCuposGratuitosMasivo(seleccionadosGratuitos)
+      if (res.success) {
+        setSeleccionadosGratuitos([])
+        handlePagoCompletado(
+          res.message || 'Cupos gratuitos habilitados como EXENTO con éxito.'
+        )
+        router.refresh()
+      } else {
+        alert(res.error || 'Ocurrió un error al habilitar los cupos seleccionados.')
+      }
+    } finally {
+      setConfirmandoMasivo(false)
     }
   }
 
@@ -373,18 +457,49 @@ export default function PanelProfesorCliente({
               Alumnos Preinscritos y Control de Recaudación
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Haga clic en <strong className="text-[#0B305B] font-semibold">&apos;Registrar Pago&apos;</strong> para registrar pagos en efectivo o transferencias electrónicas.
+              Haga clic en <strong className="text-[#0B305B] font-semibold">&apos;Registrar Pago&apos;</strong> para eventos de pago o en <strong className="text-blue-700 font-semibold">&apos;Confirmar Cupo&apos;</strong> para eventos gratuitos.
             </p>
           </div>
-          <span className="text-xs font-bold px-3 py-1 bg-white border border-slate-200 text-slate-700 rounded-lg self-start sm:self-auto shadow-sm">
-            {inscripcionesFiltradas.length} alumno(s) listado(s)
-          </span>
+          <div className="flex items-center gap-2.5 flex-wrap self-start sm:self-auto">
+            {pendientesGratuitosVisibles.length > 0 && (
+              <button
+                type="button"
+                onClick={handleConfirmarMasivoGratuitos}
+                disabled={seleccionadosGratuitos.length === 0 || confirmandoMasivo}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-500 shadow-sm transition cursor-pointer disabled:cursor-not-allowed"
+              >
+                {confirmandoMasivo ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5" />
+                )}
+                <span>
+                  Habilitar seleccionados (Gratuito)
+                  {seleccionadosGratuitos.length > 0 ? ` (${seleccionadosGratuitos.length})` : ''}
+                </span>
+              </button>
+            )}
+            <span className="text-xs font-bold px-3 py-1 bg-white border border-slate-200 text-slate-700 rounded-lg shadow-sm">
+              {inscripcionesFiltradas.length} alumno(s) listado(s)
+            </span>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-600">
             <thead className="bg-[#0B305B] text-white font-bold border-b-2 border-[#D2202E] uppercase tracking-wider text-[11px]">
               <tr>
+                <th className="pl-5 pr-2 py-3.5 w-10">
+                  {pendientesGratuitosVisibles.length > 0 && (
+                    <input
+                      type="checkbox"
+                      checked={todosGratuitosSeleccionados}
+                      onChange={toggleSeleccionarTodosGratuitos}
+                      title="Seleccionar todos los cupos gratuitos pendientes visibles"
+                      className="w-4 h-4 rounded border-white/40 accent-blue-500 cursor-pointer"
+                    />
+                  )}
+                </th>
                 <th className="px-5 py-3.5">Estudiante</th>
                 <th className="px-5 py-3.5">Evento & Tarifa</th>
                 <th className="px-5 py-3.5">Asignatura Bonificación</th>
@@ -396,7 +511,7 @@ export default function PanelProfesorCliente({
             <tbody className="divide-y divide-slate-100">
               {inscripcionesFiltradas.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
                     <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                     <p className="font-semibold text-slate-600 text-sm">
                       No se encontraron alumnos preinscritos con los filtros actuales
@@ -410,15 +525,36 @@ export default function PanelProfesorCliente({
                 inscripcionesFiltradas.map((ins) => {
                   const esPendiente = ins.estado_pago === 'PENDIENTE'
                   const esPagado = ins.estado_pago === 'PAGADO'
+                  const esGratuito = ins.evento.precio === 0
                   const esTransferencia = ins.metodo_pago === 'TRANSFERENCIA'
+                  const estaSeleccionado = seleccionadosGratuitos.includes(ins.id)
 
                   return (
                     <tr
                       key={ins.id}
                       className={`transition-colors hover:bg-slate-50 ${
-                        esPendiente ? 'bg-amber-50/20' : ''
+                        estaSeleccionado
+                          ? 'bg-blue-50/40'
+                          : esPendiente
+                          ? 'bg-amber-50/20'
+                          : ''
                       }`}
                     >
+                      {/* Checkbox para habilitación masiva en eventos gratuitos */}
+                      <td className="pl-5 pr-2 py-4">
+                        {esPendiente && esGratuito ? (
+                          <input
+                            type="checkbox"
+                            checked={estaSeleccionado}
+                            onChange={() => toggleSeleccionarGratuito(ins.id)}
+                            aria-label={`Seleccionar a ${ins.usuario.nombre}`}
+                            className="w-4 h-4 rounded border-slate-300 accent-blue-600 cursor-pointer"
+                          />
+                        ) : (
+                          <span className="text-slate-300 select-none">&mdash;</span>
+                        )}
+                      </td>
+
                       {/* Alumno */}
                       <td className="px-5 py-4 font-medium text-slate-900">
                         <div className="font-bold text-[#0B305B]">{ins.usuario.nombre}</div>
@@ -511,16 +647,32 @@ export default function PanelProfesorCliente({
                         </span>
                       </td>
 
-                      {/* Botón Acción Registrar Pago / Revertir */}
+                      {/* Botón Acción Registrar Pago / Confirmar Cupo / Revertir */}
                       <td className="px-5 py-4 text-right">
                         {esPendiente ? (
-                          <button
-                            onClick={() => abrirModalPago(ins)}
-                            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-[#D2202E] hover:bg-[#B01824] rounded-xl shadow-md shadow-[#D2202E]/20 transition-all cursor-pointer transform hover:-translate-y-0.5"
-                          >
-                            <HandCoins className="w-3.5 h-3.5" />
-                            Registrar Pago
-                          </button>
+                          esGratuito ? (
+                            <button
+                              type="button"
+                              onClick={() => handleConfirmarCupoGratuito(ins)}
+                              disabled={confirmandoGratuitoId === ins.id}
+                              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-xl shadow-md shadow-blue-600/20 transition-all cursor-pointer transform hover:-translate-y-0.5"
+                            >
+                              {confirmandoGratuitoId === ins.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Sparkles className="w-3.5 h-3.5" />
+                              )}
+                              Confirmar Cupo
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => abrirModalPago(ins)}
+                              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-[#D2202E] hover:bg-[#B01824] rounded-xl shadow-md shadow-[#D2202E]/20 transition-all cursor-pointer transform hover:-translate-y-0.5"
+                            >
+                              <HandCoins className="w-3.5 h-3.5" />
+                              Registrar Pago
+                            </button>
+                          )
                         ) : esPagado ? (
                           <div className="flex items-center justify-end gap-2">
                             <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100/70 px-2.5 py-1 rounded-lg">

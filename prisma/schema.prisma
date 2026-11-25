@@ -41,6 +41,7 @@ enum EstadoPago {
 enum MetodoAsistencia {
   QR
   MANUAL
+  CODIGO_BARRAS
   BIOMETRICO
 }
 

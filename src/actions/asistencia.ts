@@ -9,7 +9,7 @@ export interface ValidarAsistenciaInput {
   documento: string // Código estudiantil, cédula o email
   eventoId: string
   staffId?: string
-  metodo?: 'QR' | 'MANUAL' | 'BIOMETRICO'
+  metodo?: 'QR' | 'MANUAL' | 'CODIGO_BARRAS' | 'BIOMETRICO'
   bloque?: 'MANANA' | 'TARDE' | 'NOCHE' | 'UNICA' | string
 }
 
@@ -313,12 +313,27 @@ export async function registrarAsistenciaPorDocumento({
 
     // 5. Registrar asistencia exitosa en la base de datos
     const fechaActual = new Date()
+    const metodoNormalizado: MetodoAsistencia =
+      metodo === 'MANUAL' ||
+      metodo === 'CODIGO_BARRAS' ||
+      metodo === 'BIOMETRICO' ||
+      metodo === 'QR'
+        ? (metodo as MetodoAsistencia)
+        : MetodoAsistencia.QR
+
+    const detalleMetodoObs: Record<MetodoAsistencia, string> = {
+      MANUAL: 'digitación manual por staff',
+      CODIGO_BARRAS: 'lectura de código de barras de cédula',
+      QR: 'escaneo de código QR',
+      BIOMETRICO: 'registro biométrico',
+    }
+
     const nuevaAsistencia = await prisma.asistencia.create({
       data: {
         inscripcionId: inscripcion.id,
         registradoPorId: staffId || session.id,
-        metodo: (metodo as MetodoAsistencia) || MetodoAsistencia.QR,
-        observaciones: `Ingreso validado en puerta (${etiquetaBloque}) con lector de código de barras/cédula`,
+        metodo: metodoNormalizado,
+        observaciones: `Ingreso validado en puerta (${etiquetaBloque}) mediante ${detalleMetodoObs[metodoNormalizado]}`,
         fechaHoraRegistro: fechaActual,
         fechaJornada: fechaActual,
         bloque: bloqueValido,

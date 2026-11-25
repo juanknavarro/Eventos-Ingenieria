@@ -68,10 +68,48 @@ export async function registrarPago({
       }
     }
 
-    if (inscripcion.estado_pago === EstadoPago.PAGADO) {
+    if (
+      inscripcion.estado_pago === EstadoPago.PAGADO ||
+      inscripcion.estado_pago === EstadoPago.EXENTO
+    ) {
       return {
         success: false,
-        error: 'Esta inscripción ya se encuentra pagada.',
+        error: 'Esta inscripción ya se encuentra pagada o confirmada como exenta.',
+      }
+    }
+
+    // Eventos gratuitos (precio === 0): confirmar siempre como EXENTO, monto 0 y metodo_pago null
+    if (inscripcion.evento.precio === 0) {
+      const inscripcionGratuita = await prisma.inscripcion.update({
+        where: { id: inscripcionId },
+        data: {
+          estado_pago: EstadoPago.EXENTO,
+          metodo_pago: null,
+          montoPagado: 0,
+          profesor_responsable_dinero:
+            profesorNombre ||
+            session.nombre ||
+            inscripcion.profesor_responsable_dinero ||
+            'Profesor de Turno',
+          profesorResponsableId: session.id,
+          comprobanteUrl: observaciones?.trim()
+            ? `CUPO_GRATUITO: ${observaciones.trim()}`
+            : `CUPO_GRATUITO_${Date.now()}`,
+        } as any,
+      })
+
+      try {
+        revalidatePath('/')
+        revalidatePath('/profesor')
+        revalidatePath('/admin/reportes')
+      } catch {
+        // Ignorar fuera de contexto HTTP
+      }
+
+      return {
+        success: true,
+        data: inscripcionGratuita,
+        message: `Cupo gratuito confirmado (EXENTO) con éxito para ${inscripcion.usuario.nombre}.`,
       }
     }
 
@@ -228,6 +266,75 @@ export async function revertirPago(inscripcionId: string) {
     return {
       success: false,
       error: 'No se pudo revertir el estado del pago.',
+    }
+  }
+}
+
+/**
+ * Confirma masivamente como EXENTO las inscripciones PENDIENTE de eventos gratuitos (precio === 0)
+ */
+export async function confirmarCuposGratuitosMasivo(inscripcionIds: string[]) {
+  try {
+    const session = await getAuthSession()
+    if (
+      !session ||
+      (session.rol !== RolUsuario.PROFESOR &&
+        session.rol !== RolUsuario.ADMIN &&
+        session.rol !== RolUsuario.SUPER_ADMIN)
+    ) {
+      return {
+        success: false,
+        error: 'Acceso no autorizado: Se requieren privilegios de Docente o Administrador.',
+      }
+    }
+
+    const idsLimpios = Array.isArray(inscripcionIds)
+      ? inscripcionIds.map((id) => id?.trim()).filter(Boolean)
+      : []
+
+    if (idsLimpios.length === 0) {
+      return {
+        success: false,
+        error: 'No se seleccionaron inscripciones válidas para confirmar.',
+      }
+    }
+
+    const resultado = await prisma.inscripcion.updateMany({
+      where: {
+        id: { in: idsLimpios },
+        estado_pago: EstadoPago.PENDIENTE,
+        evento: {
+          precio: 0,
+        },
+      },
+      data: {
+        estado_pago: EstadoPago.EXENTO,
+        montoPagado: 0,
+        metodo_pago: null,
+        profesorResponsableId: session.id,
+        profesor_responsable_dinero: session.nombre || 'Docente / Admin',
+        comprobanteUrl: `CUPO_GRATUITO_MASIVO_${Date.now()}`,
+      },
+    })
+
+    try {
+      revalidatePath('/')
+      revalidatePath('/profesor')
+      revalidatePath('/admin/reportes')
+    } catch {
+      // Ignorar fuera de contexto HTTP
+    }
+
+    return {
+      success: true,
+      actualizados: resultado.count,
+      message: `${resultado.count} cupo(s) gratuito(s) confirmado(s) como EXENTO con éxito.`,
+    }
+  } catch (error) {
+    console.error('Error en confirmación masiva de cupos gratuitos:', error)
+    return {
+      success: false,
+      error: 'Ocurrió un error en el servidor al confirmar los cupos gratuitos.',
     }
   }
 }

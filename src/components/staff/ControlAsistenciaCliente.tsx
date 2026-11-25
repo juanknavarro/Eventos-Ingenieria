@@ -20,6 +20,8 @@ import {
   ArrowLeft,
   GraduationCap,
   Loader2,
+  Camera,
+  X,
 } from 'lucide-react'
 import {
   registrarAsistenciaPorDocumento,
@@ -126,6 +128,16 @@ export default function ControlAsistenciaCliente({
   // Referencia para mantener el autofoco permanente
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Trazabilidad de entrada por velocidad de pulsaciones (Lector hardware < 50ms vs Digitación humana >= 50ms)
+  const ultimoTiempoTeclaRef = useRef<number>(0)
+  const intervalosTeclasRef = useRef<number[]>([])
+  const envioPorBotonRef = useRef<boolean>(false)
+
+  // Escáner con Cámara QR (html5-qrcode)
+  const [camaraAbierta, setCamaraAbierta] = useState<boolean>(false)
+  const [errorCamara, setErrorCamara] = useState<string | null>(null)
+  const ultimoQrCamaraRef = useRef<{ texto: string; tiempo: number }>({ texto: '', tiempo: 0 })
+
   // Función para emitir tonos de audio con Web Audio API
   const emitirSonido = useCallback(
     (tipo: 'EXITO' | 'ERROR' | 'ALERTA') => {
@@ -225,71 +237,169 @@ export default function ControlAsistenciaCliente({
     }
   }, [eventoSeleccionado?.id])
 
-  // Manejar el submit del escaneo (Lector de código de barras emula teclado + Enter)
+  // Detectar método de entrada según velocidad de pulsación (< 50ms = hardware) y formato
+  const detectarMetodoEntrada = (valor: string): 'QR' | 'MANUAL' | 'CODIGO_BARRAS' => {
+    if (envioPorBotonRef.current) return 'MANUAL'
+
+    const intervalos = intervalosTeclasRef.current
+    if (intervalos.length >= 3) {
+      const promedioMs = intervalos.reduce((acc, ms) => acc + ms, 0) / intervalos.length
+      if (promedioMs < 50) {
+        const esFormatoQr =
+          /^https?:\/\//i.test(valor) ||
+          valor.includes('escarapela') ||
+          valor.includes('/api/') ||
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(valor) ||
+          /^c[a-z0-9]{20,30}$/i.test(valor) ||
+          /[:{}=]/.test(valor)
+
+        return esFormatoQr ? 'QR' : 'CODIGO_BARRAS'
+      }
+    }
+
+    return 'MANUAL'
+  }
+
+  // Función unificada de validación de asistencia
+  const procesarValidacion = useCallback(
+    async (valorBruto: string, metodoDetectado: 'QR' | 'MANUAL' | 'CODIGO_BARRAS') => {
+      const valor = valorBruto.trim()
+      if (!valor || procesando) return
+
+      setProcesando(true)
+      setDocumentoInput('')
+      ultimoTiempoTeclaRef.current = 0
+      intervalosTeclasRef.current = []
+      envioPorBotonRef.current = false
+
+      try {
+        const resultado = await registrarAsistenciaPorDocumento({
+          documento: valor,
+          eventoId,
+          staffId,
+          metodo: metodoDetectado,
+          bloque: bloqueSeleccionado,
+        })
+
+        setUltimoResultado(resultado)
+
+        if (resultado.success) {
+          emitirSonido('EXITO')
+          if (resultado.usuario && resultado.asistencia) {
+            const nuevoRegistro: AsistenciaHistorial = {
+              id: resultado.asistencia.id,
+              fechaHoraRegistro: new Date(),
+              metodo: resultado.asistencia.metodo,
+              bloque: resultado.asistencia.bloque,
+              inscripcion: {
+                asignatura_bonificacion:
+                  resultado.inscripcion?.asignatura_bonificacion || null,
+                usuario: {
+                  nombre: resultado.usuario.nombre,
+                  codigoEstudiantil: resultado.usuario.codigoEstudiantil,
+                  carrera: resultado.usuario.carrera,
+                },
+                evento: {
+                  titulo: eventoSeleccionado?.titulo || 'Evento',
+                },
+              },
+              registradoPor: {
+                nombre: staffSeleccionado?.nombre || 'Staff',
+              },
+            }
+            setHistorial((prev) => [nuevoRegistro, ...prev])
+          }
+        } else {
+          emitirSonido(resultado.tipo === 'YA_REGISTRADO' ? 'ALERTA' : 'ERROR')
+        }
+      } catch (err) {
+        console.error(err)
+        emitirSonido('ERROR')
+        setUltimoResultado({
+          success: false,
+          tipo: 'ERROR_SERVIDOR',
+          mensaje: 'Error de conexión con el servidor de validación.',
+        })
+      } finally {
+        setProcesando(false)
+        setTimeout(() => {
+          inputRef.current?.focus()
+        }, 50)
+      }
+    },
+    [
+      procesando,
+      eventoId,
+      staffId,
+      bloqueSeleccionado,
+      emitirSonido,
+      eventoSeleccionado?.titulo,
+      staffSeleccionado?.nombre,
+    ]
+  )
+
+  // Ciclo de vida de la cámara QR (html5-qrcode)
+  useEffect(() => {
+    if (!camaraAbierta) return
+
+    let scanner: any = null
+    let cancelado = false
+
+    const iniciarCamara = async () => {
+      setErrorCamara(null)
+      try {
+        const { Html5Qrcode } = await import('html5-qrcode')
+        if (cancelado) return
+
+        scanner = new Html5Qrcode('lector-qr-camara')
+        await scanner.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: { width: 240, height: 240 } },
+          (decodedText: string) => {
+            const ahora = Date.now()
+            if (
+              ultimoQrCamaraRef.current.texto === decodedText &&
+              ahora - ultimoQrCamaraRef.current.tiempo < 2500
+            ) {
+              return
+            }
+            ultimoQrCamaraRef.current = { texto: decodedText, tiempo: ahora }
+            setCamaraAbierta(false)
+            procesarValidacion(decodedText, 'QR')
+          },
+          () => {}
+        )
+      } catch (err) {
+        console.warn('Error iniciando cámara QR:', err)
+        if (!cancelado) {
+          setErrorCamara(
+            'No se pudo acceder a la cámara. Verifica los permisos del navegador o usa el lector USB/manual.'
+          )
+        }
+      }
+    }
+
+    iniciarCamara()
+
+    return () => {
+      cancelado = true
+      if (scanner) {
+        scanner
+          .stop()
+          .then(() => scanner.clear())
+          .catch(() => {})
+      }
+    }
+  }, [camaraAbierta, procesarValidacion])
+
+  // Manejar el submit del escaneo / digitación manual
   const handleEscaneo = async (e: React.FormEvent) => {
     e.preventDefault()
     const valor = documentoInput.trim()
     if (!valor || procesando) return
 
-    setProcesando(true)
-    setDocumentoInput('') // Limpiar inmediatamente para el próximo escaneo
-
-    try {
-      const resultado = await registrarAsistenciaPorDocumento({
-        documento: valor,
-        eventoId,
-        staffId,
-        metodo: 'QR',
-        bloque: bloqueSeleccionado,
-      })
-
-      setUltimoResultado(resultado)
-
-      if (resultado.success) {
-        emitirSonido('EXITO')
-        // Agregar al historial local
-        if (resultado.usuario && resultado.asistencia) {
-          const nuevoRegistro: AsistenciaHistorial = {
-            id: resultado.asistencia.id,
-            fechaHoraRegistro: new Date(),
-            metodo: resultado.asistencia.metodo,
-            bloque: resultado.asistencia.bloque,
-            inscripcion: {
-              asignatura_bonificacion:
-                resultado.inscripcion?.asignatura_bonificacion || null,
-              usuario: {
-                nombre: resultado.usuario.nombre,
-                codigoEstudiantil: resultado.usuario.codigoEstudiantil,
-                carrera: resultado.usuario.carrera,
-              },
-              evento: {
-                titulo: eventoSeleccionado?.titulo || 'Evento',
-              },
-            },
-            registradoPor: {
-              nombre: staffSeleccionado?.nombre || 'Staff',
-            },
-          }
-          setHistorial((prev) => [nuevoRegistro, ...prev])
-        }
-      } else {
-        emitirSonido(resultado.tipo === 'YA_REGISTRADO' ? 'ALERTA' : 'ERROR')
-      }
-    } catch (err) {
-      console.error(err)
-      emitirSonido('ERROR')
-      setUltimoResultado({
-        success: false,
-        tipo: 'ERROR_SERVIDOR',
-        mensaje: 'Error de conexión con el servidor de validación.',
-      })
-    } finally {
-      setProcesando(false)
-      // Re-enfocar el campo de escaneo inmediatamente
-      setTimeout(() => {
-        inputRef.current?.focus()
-      }, 50)
-    }
+    const metodoDetectado = detectarMetodoEntrada(valor)
+    await procesarValidacion(valor, metodoDetectado)
   }
 
 
@@ -430,7 +540,7 @@ export default function ControlAsistenciaCliente({
           </div>
 
           {/* Formulario de Escaneo con Autofoco Blindado */}
-          <form onSubmit={handleEscaneo} className="max-w-xl mx-auto pt-2">
+          <form onSubmit={handleEscaneo} className="max-w-xl mx-auto pt-2 space-y-3">
             <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-emerald-400 transition-colors">
                 <ScanBarcode className="w-6 h-6" />
@@ -439,21 +549,77 @@ export default function ControlAsistenciaCliente({
                 ref={inputRef}
                 type="text"
                 value={documentoInput}
-                onChange={(e) => setDocumentoInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                    const ahora = performance.now()
+                    if (ultimoTiempoTeclaRef.current > 0) {
+                      intervalosTeclasRef.current.push(ahora - ultimoTiempoTeclaRef.current)
+                    }
+                    ultimoTiempoTeclaRef.current = ahora
+                  }
+                }}
+                onChange={(e) => {
+                  const val = e.target.value
+                  setDocumentoInput(val)
+                  if (!val) {
+                    ultimoTiempoTeclaRef.current = 0
+                    intervalosTeclasRef.current = []
+                  }
+                }}
                 autoFocus
                 autoComplete="off"
-                placeholder="Esperando código de barras o cédula..."
+                placeholder="Esperando código de barras, QR o cédula..."
                 className="w-full pl-13 pr-28 py-4 bg-white/10 hover:bg-white/15 focus:bg-white text-white focus:text-slate-900 text-lg sm:text-xl font-mono font-bold rounded-2xl border-2 border-indigo-400/40 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400 shadow-inner"
               />
               <button
                 type="submit"
+                onClick={() => {
+                  envioPorBotonRef.current = true
+                }}
                 disabled={procesando || !documentoInput.trim()}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-700 text-white font-bold text-xs rounded-xl shadow transition cursor-pointer"
               >
                 {procesando ? 'Validando...' : 'Validar'}
               </button>
             </div>
+
+            <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                onClick={() => setCamaraAbierta((prev) => !prev)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-bold text-white transition cursor-pointer"
+              >
+                <Camera className="w-4 h-4 text-emerald-300" />
+                <span>{camaraAbierta ? 'Cerrar Cámara QR' : 'Escanear con Cámara'}</span>
+              </button>
+            </div>
           </form>
+
+          {/* Visor Opcional de Cámara QR */}
+          {camaraAbierta && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="max-w-sm mx-auto mt-3 bg-slate-950/90 border border-emerald-400/40 rounded-2xl p-4 space-y-3 text-left"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+                  <Camera className="w-4 h-4" />
+                  Escáner QR por Cámara
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCamaraAbierta(false)}
+                  className="p-1 text-slate-400 hover:text-white rounded-lg cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div id="lector-qr-camara" className="w-full rounded-xl overflow-hidden bg-black min-h-[220px]" />
+              {errorCamara && (
+                <p className="text-[11px] text-rose-300 font-medium">{errorCamara}</p>
+              )}
+            </div>
+          )}
 
         </div>
       </section>
@@ -731,8 +897,22 @@ export default function ControlAsistenciaCliente({
                     </td>
 
                     <td className="px-5 py-3.5">
-                      <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">
-                        {item.metodo}
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded font-bold text-[10px] border ${
+                          item.metodo === 'MANUAL'
+                            ? 'bg-amber-100 text-amber-800 border-amber-200'
+                            : item.metodo === 'CODIGO_BARRAS'
+                            ? 'bg-indigo-100 text-indigo-800 border-indigo-200'
+                            : item.metodo === 'BIOMETRICO'
+                            ? 'bg-purple-100 text-purple-800 border-purple-200'
+                            : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                        }`}
+                      >
+                        {item.metodo === 'CODIGO_BARRAS'
+                          ? 'CÓDIGO BARRAS'
+                          : item.metodo === 'BIOMETRICO'
+                          ? 'BIOMÉTRICO'
+                          : item.metodo}
                       </span>
                     </td>
 
