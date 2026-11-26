@@ -25,11 +25,20 @@ export default async function AsignaturasPage() {
 
   const filtroAsignaturas = filtroAsignaturasPorTenancy(session)
 
-  // Consulta de asignaturas con aislamiento Multi-Tenancy
-  const asignaturas = await prisma.asignatura.findMany({
-    where: filtroAsignaturas,
-    orderBy: [{ programa_academico: 'asc' }, { nombre: 'asc' }],
-  })
+  // Consulta de asignaturas y programas activos en paralelo
+  const [asignaturas, programas] = await Promise.all([
+    prisma.asignatura.findMany({
+      where: filtroAsignaturas,
+      orderBy: [{ programa_academico: 'asc' }, { nombre: 'asc' }],
+    }),
+    prisma.programa.findMany({
+      where: { estado_activo: true },
+      orderBy: { nombre: 'asc' },
+      select: { nombre: true },
+    }),
+  ])
+
+  const programasDisponibles = programas.map((p) => p.nombre)
 
   const asignaturasMapeadas = asignaturas.map((a) => ({
     id: a.id,
@@ -108,9 +117,10 @@ export default async function AsignaturasPage() {
           </div>
         </div>
 
-        {/* Módulo Cliente con Tabla, Botón '+ Agregar Asignatura', Modales y Toggle */}
+        {/* Módulo Cliente con Tabla, Botón '+ Agregar Asignatura', Carga Masiva y Modales */}
         <GestionAsignaturasCliente
           asignaturasIniciales={asignaturasMapeadas}
+          programasDisponibles={programasDisponibles}
           usuarioActual={{
             rol: session.rol,
             programa: session.carrera,

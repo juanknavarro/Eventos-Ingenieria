@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import {
   BookOpen,
   Plus,
@@ -13,9 +13,11 @@ import {
   Loader2,
   GraduationCap,
   Filter,
+  ListPlus,
 } from 'lucide-react'
 import {
   crearAsignatura,
+  crearAsignaturasMasivo,
   actualizarAsignatura,
   alternarEstadoAsignatura,
   eliminarAsignatura,
@@ -31,39 +33,58 @@ export interface AsignaturaItem {
 
 interface Props {
   asignaturasIniciales: AsignaturaItem[]
+  programasDisponibles?: string[]
   usuarioActual?: {
     rol: string
     programa: string | null
   }
 }
 
-export const PROGRAMAS_DISPONIBLES = [
-  'Ingeniería de Sistemas',
-  'Ingeniería Industrial',
-  'Ingeniería Civil',
-  'Ingeniería Eléctrica',
-  'Ingeniería Mecánica',
-  'Ciencias Básicas de Ingeniería',
-]
+function limpiarLineaAsignatura(linea: string): string {
+  return linea
+    .trim()
+    .replace(/^(?:[•\-*–—]+|\d+[.):\-]+)\s*/, '')
+    .replace(/\s*\(\s*\d+\s*(?:cr[eé]ditos?|crs?|cr\.?)\s*\)\s*$/i, '')
+    .trim()
+}
 
 export default function GestionAsignaturasCliente({
   asignaturasIniciales,
+  programasDisponibles = [],
   usuarioActual,
 }: Props) {
   const esAdminPrograma = usuarioActual?.rol === 'ADMIN'
   const programaUsuario = usuarioActual?.programa?.trim() || ''
-  const opcionesProgramas =
-    programaUsuario && !PROGRAMAS_DISPONIBLES.includes(programaUsuario)
-      ? [programaUsuario, ...PROGRAMAS_DISPONIBLES]
-      : PROGRAMAS_DISPONIBLES
+  const opcionesProgramas = useMemo(() => {
+    const base = [...programasDisponibles]
+    if (programaUsuario && !base.includes(programaUsuario)) {
+      base.unshift(programaUsuario)
+    }
+    return base
+  }, [programasDisponibles, programaUsuario])
+
   const [asignaturas, setAsignaturas] = useState<AsignaturaItem[]>(asignaturasIniciales)
   const [busqueda, setBusqueda] = useState('')
   const [filtroPrograma, setFiltroPrograma] = useState('todos')
 
   // Modales
   const [modalCrearAbierto, setModalCrearAbierto] = useState(false)
+  const [modalMasivoAbierto, setModalMasivoAbierto] = useState(false)
   const [asignaturaAEditar, setAsignaturaAEditar] = useState<AsignaturaItem | null>(null)
   const [asignaturaAEliminar, setAsignaturaAEliminar] = useState<AsignaturaItem | null>(null)
+
+  // Estados de Carga Masiva
+  const [textoMasivo, setTextoMasivo] = useState('')
+  const [programaMasivo, setProgramaMasivo] = useState(
+    esAdminPrograma && programaUsuario ? programaUsuario : opcionesProgramas[0] || ''
+  )
+
+  const materiasMasivasLimpias = useMemo(() => {
+    return textoMasivo
+      .split(/\r?\n/)
+      .map(limpiarLineaAsignatura)
+      .filter(Boolean)
+  }, [textoMasivo])
 
   // Estados de carga y mensajes
   const [cargando, setCargando] = useState(false)
@@ -106,6 +127,40 @@ export default function GestionAsignaturasCliente({
       mostrarMensaje(true, res.message || 'Asignatura registrada.')
     } else {
       mostrarMensaje(false, res.error || 'Error al crear la asignatura.')
+    }
+  }
+
+  // 1B. Carga Masiva de Asignaturas
+  const handleCrearMasivo = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (materiasMasivasLimpias.length === 0) {
+      mostrarMensaje(false, 'Pega al menos una asignatura válida antes de guardar.')
+      return
+    }
+
+    const programaEnviar =
+      esAdminPrograma && programaUsuario ? programaUsuario : programaMasivo
+
+    setCargando(true)
+    const res = await crearAsignaturasMasivo(materiasMasivasLimpias, programaEnviar)
+    setCargando(false)
+
+    if (res.success) {
+      if (res.asignaturasCreadas && res.asignaturasCreadas.length > 0) {
+        setAsignaturas((prev) => [
+          ...(res.asignaturasCreadas as AsignaturaItem[]),
+          ...prev,
+        ])
+      }
+      setModalMasivoAbierto(false)
+      setTextoMasivo('')
+      mostrarMensaje(
+        true,
+        res.message ||
+          `Carga masiva completada: ${res.creadas} creada(s) y ${res.omitidas} omitida(s).`
+      )
+    } else {
+      mostrarMensaje(false, res.error || 'Error al ejecutar la carga masiva.')
     }
   }
 
@@ -216,7 +271,7 @@ export default function GestionAsignaturasCliente({
               className="w-full sm:w-60 px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-bold text-slate-700 outline-none cursor-pointer transition"
             >
               <option value="todos">Todos los Programas Académicos</option>
-              {PROGRAMAS_DISPONIBLES.map((prog) => (
+              {opcionesProgramas.map((prog) => (
                 <option key={prog} value={prog}>
                   {prog}
                 </option>
@@ -225,15 +280,33 @@ export default function GestionAsignaturasCliente({
           </div>
         </div>
 
-        {/* Botón Principal '+ Agregar Asignatura' */}
-        <button
-          type="button"
-          onClick={() => setModalCrearAbierto(true)}
-          className="w-full sm:w-auto px-4 py-2.5 bg-[#0B305B] hover:bg-[#082240] text-white text-xs font-extrabold rounded-xl shadow-md shadow-[#0B305B]/20 transition flex items-center justify-center gap-2 cursor-pointer"
-        >
-          <Plus className="w-4 h-4 text-[#D2202E]" />
-          + Agregar Asignatura
-        </button>
+        {/* Botones de Acción: Carga Masiva y '+ Agregar Asignatura' */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
+          <button
+            type="button"
+            onClick={() => {
+              setProgramaMasivo(
+                esAdminPrograma && programaUsuario
+                  ? programaUsuario
+                  : opcionesProgramas[0] || ''
+              )
+              setModalMasivoAbierto(true)
+            }}
+            className="w-full sm:w-auto px-4 py-2.5 bg-white hover:bg-slate-50 text-[#0B305B] border border-slate-300 text-xs font-extrabold rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <ListPlus className="w-4 h-4 text-[#D2202E]" />
+            Carga Masiva
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setModalCrearAbierto(true)}
+            className="w-full sm:w-auto px-4 py-2.5 bg-[#0B305B] hover:bg-[#082240] text-white text-xs font-extrabold rounded-xl shadow-md shadow-[#0B305B]/20 transition flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <Plus className="w-4 h-4 text-[#D2202E]" />
+            + Agregar Asignatura
+          </button>
+        </div>
       </div>
 
       {/* Tabla Limpia de Asignaturas */}
@@ -434,6 +507,134 @@ export default function GestionAsignaturasCliente({
                     </>
                   ) : (
                     'Guardar Asignatura'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 1B: CARGA MASIVA DE ASIGNATURAS */}
+      {/* ========================================================================= */}
+      {modalMasivoAbierto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-5 animate-in fade-in zoom-in-95 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 shrink-0">
+              <h3 className="text-base font-black text-[#0B305B] flex items-center gap-2">
+                <ListPlus className="w-5 h-5 text-[#D2202E]" />
+                Carga Masiva de Asignaturas
+              </h3>
+              <button
+                type="button"
+                onClick={() => setModalMasivoAbierto(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-full transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCrearMasivo} className="space-y-4 text-xs overflow-y-auto pr-1">
+              <div className="space-y-1">
+                <label className="font-bold text-slate-800">
+                  Programa Académico <span className="text-[#D2202E]">*</span>
+                </label>
+                {esAdminPrograma && programaUsuario ? (
+                  <select
+                    value={programaUsuario}
+                    disabled
+                    className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl outline-none text-xs font-bold text-slate-600 cursor-not-allowed"
+                  >
+                    {opcionesProgramas.map((prog) => (
+                      <option key={prog} value={prog}>
+                        {prog}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <select
+                    value={programaMasivo}
+                    onChange={(e) => setProgramaMasivo(e.target.value)}
+                    required
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none text-xs font-bold text-slate-800 cursor-pointer"
+                  >
+                    {opcionesProgramas.map((prog) => (
+                      <option key={prog} value={prog}>
+                        {prog}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-slate-800">
+                  Listado de Asignaturas (una por línea) <span className="text-[#D2202E]">*</span>
+                </label>
+                <textarea
+                  rows={6}
+                  value={textoMasivo}
+                  onChange={(e) => setTextoMasivo(e.target.value)}
+                  placeholder={`Pega aquí el pensum o lista de materias, por ejemplo:\n• Cálculo Diferencial (4 créditos)\n- Programación Orientada a Objetos (3 créditos)\n1. Bases de Datos I`}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none text-xs leading-relaxed transition font-mono"
+                />
+                <p className="text-[11px] text-slate-500">
+                  Se limpiarán automáticamente viñetas iniciales (`•`, `-`, `*`, `1.`) y créditos entre paréntesis al final.
+                </p>
+              </div>
+
+              {/* Lista Previa Numerada en Tiempo Real */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-[#0B305B] text-[11px] uppercase tracking-wide">
+                    Vista Previa de Materias Detectadas
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-[#0B305B] text-white">
+                    {materiasMasivasLimpias.length} válida(s)
+                  </span>
+                </div>
+
+                {materiasMasivasLimpias.length === 0 ? (
+                  <p className="text-[11px] text-slate-400 italic py-2">
+                    Aún no hay asignaturas detectadas. Pega el listado arriba para previsualizar.
+                  </p>
+                ) : (
+                  <ol className="max-h-40 overflow-y-auto divide-y divide-slate-200/70 bg-white rounded-xl border border-slate-200 px-3 py-1">
+                    {materiasMasivasLimpias.map((materia, idx) => (
+                      <li
+                        key={`${idx}-${materia}`}
+                        className="py-1.5 text-[11px] font-semibold text-slate-800 flex items-center gap-2"
+                      >
+                        <span className="w-5 text-right font-mono text-slate-400 shrink-0">
+                          {idx + 1}.
+                        </span>
+                        <span className="truncate">{materia}</span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-slate-100 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setModalMasivoAbierto(false)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={cargando || materiasMasivasLimpias.length === 0}
+                  className="px-5 py-2 text-xs font-extrabold text-white bg-[#0B305B] hover:bg-[#082240] rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {cargando ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Registrando lote...
+                    </>
+                  ) : (
+                    `Guardar ${materiasMasivasLimpias.length} Asignatura(s)`
                   )}
                 </button>
               </div>

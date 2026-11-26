@@ -16,8 +16,8 @@ import {
 export const dynamic = 'force-dynamic'
 
 export default async function HomePage() {
-  // 1) Consulta exclusiva de eventos PUBLICADOS, asignaturas activas y configuración institucional
-  const [eventosPublicados, asignaturasActivas, configPlantillas, sesion] = await Promise.all([
+  // 1) Consulta exclusiva de eventos PUBLICADOS, asignaturas activas, programas activos y configuración
+  const [eventosPublicados, asignaturasActivas, programasActivos, configPlantillas, sesion] = await Promise.all([
     prisma.evento.findMany({
       where: {
         estado: 'PUBLICADO',
@@ -39,6 +39,17 @@ export default async function HomePage() {
         { programa_academico: 'asc' },
         { nombre: 'asc' },
       ],
+    }),
+    prisma.programa.findMany({
+      where: {
+        estado_activo: true,
+      },
+      orderBy: {
+        nombre: 'asc',
+      },
+      select: {
+        nombre: true,
+      },
     }),
     obtenerConfiguracionPlantillas(),
     getAuthSession(),
@@ -107,6 +118,7 @@ export default async function HomePage() {
           <CatalogoEventosPublico
             eventos={eventosPublicados}
             asignaturas={asignaturasActivas}
+            programas={programasActivos.map((p) => p.nombre)}
           />
         </section>
       </main>

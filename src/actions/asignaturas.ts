@@ -237,3 +237,108 @@ export async function eliminarAsignatura(id: string) {
   }
 }
 
+/**
+ * Crea múltiples asignaturas en lote para un programa académico,
+ * respetando permisos por rol y omitiendo duplicados internos o ya registrados en DB.
+ */
+export async function crearAsignaturasMasivo(
+  nombres: string[],
+  programaAcademico: string
+) {
+  try {
+    const session = await verificarAdmin()
+
+    let programaFinal = programaAcademico?.trim() || ''
+    if (session.rol === RolUsuario.ADMIN) {
+      const programaSession = session.carrera?.trim()
+      if (!programaSession) {
+        return {
+          success: false,
+          error: 'Tu usuario administrador no tiene un programa académico asignado.',
+        }
+      }
+      programaFinal = programaSession
+    }
+
+    if (!programaFinal) {
+      return {
+        success: false,
+        error: 'Debes seleccionar un programa académico válido.',
+      }
+    }
+
+    const entradasLimpias = (Array.isArray(nombres) ? nombres : [])
+      .map((n) => (typeof n === 'string' ? n.trim() : ''))
+      .filter(Boolean)
+
+    if (entradasLimpias.length === 0) {
+      return {
+        success: false,
+        error: 'No se detectaron asignaturas válidas para registrar.',
+      }
+    }
+
+    // Deduplicación interna insensible a mayúsculas/minúsculas
+    const mapaUnicos = new Map<string, string>()
+    for (const nombre of entradasLimpias) {
+      const clave = nombre.toLowerCase()
+      if (!mapaUnicos.has(clave)) {
+        mapaUnicos.set(clave, nombre)
+      }
+    }
+
+    // Consultar asignaturas ya existentes en ese programa
+    const existentes = await prisma.asignatura.findMany({
+      where: {
+        programa_academico: { equals: programaFinal, mode: 'insensitive' },
+      },
+      select: { nombre: true },
+    })
+
+    const setExistentes = new Set(existentes.map((e) => e.nombre.trim().toLowerCase()))
+
+    const nuevosNombres: string[] = []
+    for (const [clave, nombreOriginal] of mapaUnicos.entries()) {
+      if (!setExistentes.has(clave)) {
+        nuevosNombres.push(nombreOriginal)
+      }
+    }
+
+    const omitidas = entradasLimpias.length - nuevosNombres.length
+
+    const asignaturasCreadas =
+      nuevosNombres.length > 0
+        ? await prisma.$transaction(
+            nuevosNombres.map((nombre) =>
+              prisma.asignatura.create({
+                data: {
+                  nombre,
+                  programa_academico: programaFinal,
+                  activa: true,
+                },
+              })
+            )
+          )
+        : []
+
+    try {
+      revalidatePath('/admin/asignaturas')
+      revalidatePath('/')
+    } catch {}
+
+    return {
+      success: true,
+      creadas: asignaturasCreadas.length,
+      omitidas,
+      asignaturasCreadas,
+      message: `Carga masiva completada: ${asignaturasCreadas.length} asignatura(s) creada(s) y ${omitidas} omitida(s) por estar repetida(s).`,
+    }
+  } catch (err: any) {
+    console.error('Error en carga masiva de asignaturas:', err)
+    return {
+      success: false,
+      error: err?.message || 'Ocurrió un error al registrar las asignaturas en lote.',
+    }
+  }
+}
+

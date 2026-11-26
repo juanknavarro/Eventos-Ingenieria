@@ -52,9 +52,11 @@ export async function crearPrograma(formData: FormData): Promise<ActionResult> {
     })
 
     revalidatePath('/admin/programas')
+    revalidatePath('/admin/asignaturas')
     revalidatePath('/admin')
     revalidatePath('/admin/reportes')
     revalidatePath('/admin/eventos/nuevo')
+    revalidatePath('/')
 
     return {
       success: true,
@@ -108,9 +110,11 @@ export async function actualizarPrograma(
     })
 
     revalidatePath('/admin/programas')
+    revalidatePath('/admin/asignaturas')
     revalidatePath('/admin')
     revalidatePath('/admin/reportes')
     revalidatePath('/admin/eventos/nuevo')
+    revalidatePath('/')
 
     return {
       success: true,
@@ -145,9 +149,11 @@ export async function alternarEstadoPrograma(
     })
 
     revalidatePath('/admin/programas')
+    revalidatePath('/admin/asignaturas')
     revalidatePath('/admin')
     revalidatePath('/admin/reportes')
     revalidatePath('/admin/eventos/nuevo')
+    revalidatePath('/')
 
     return {
       success: true,
@@ -190,10 +196,25 @@ export async function eliminarPrograma(id: string): Promise<ActionResult> {
       return { success: false, error: 'El programa no existe.' }
     }
 
-    if (programa._count.usuarios > 0 || programa._count.eventos > 0) {
+    const asignaturasPorNombre = await prisma.asignatura.count({
+      where: {
+        programa_academico: {
+          equals: programa.nombre,
+          mode: 'insensitive',
+        },
+      },
+    })
+
+    if (
+      programa._count.usuarios > 0 ||
+      programa._count.eventos > 0 ||
+      programa._count.asignaturas > 0 ||
+      asignaturasPorNombre > 0
+    ) {
       return {
         success: false,
-        error: 'No es posible eliminar el programa porque tiene registros vinculados. Se recomienda deshabilitarlo.',
+        error:
+          'No es posible eliminar el programa porque tiene usuarios, eventos o asignaturas vinculadas. Se recomienda deshabilitarlo.',
       }
     }
 
@@ -202,9 +223,11 @@ export async function eliminarPrograma(id: string): Promise<ActionResult> {
     })
 
     revalidatePath('/admin/programas')
+    revalidatePath('/admin/asignaturas')
     revalidatePath('/admin')
     revalidatePath('/admin/reportes')
     revalidatePath('/admin/eventos/nuevo')
+    revalidatePath('/')
 
     return {
       success: true,

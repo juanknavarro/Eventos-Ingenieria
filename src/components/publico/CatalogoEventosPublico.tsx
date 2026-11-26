@@ -57,15 +57,16 @@ export interface AsignaturaOpcion {
 interface Props {
   eventos: EventoPublico[]
   asignaturas?: AsignaturaOpcion[]
+  programas?: string[]
 }
 
-const PROGRAMAS_ACADEMICOS = [
-  'Ingeniería de Sistemas',
-  'Ingeniería Industrial',
+const PROGRAMAS_FALLBACK = [
   'Ingeniería Civil',
+  'Ingeniería de Sistemas',
+  'Ingeniería Eléctrica',
   'Ingeniería Electromecánica',
-  'Ingeniería de Software y Tecnologías Emergentes',
-  'Otra Carrera / Invitado Externo',
+  'Ingeniería Industrial',
+  'Ingeniería Mecánica',
 ]
 
 const SEMESTRES = [
@@ -97,7 +98,27 @@ const ASIGNATURAS_FALLBACK = [
   'No aplica / Formación General',
 ]
 
-export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Props) {
+export default function CatalogoEventosPublico({
+  eventos,
+  asignaturas = [],
+  programas = [],
+}: Props) {
+  const programasDisponibles = React.useMemo(() => {
+    const base = programas.length > 0 ? programas : PROGRAMAS_FALLBACK
+    const filtrados = base.filter((p) => {
+      const normalizado = p
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+      return (
+        !normalizado.startsWith('ciencias basicas') &&
+        normalizado !== 'otra carrera / invitado externo'
+      )
+    })
+    return [...filtrados, 'Otra Carrera / Invitado Externo']
+  }, [programas])
+
   const [eventoSeleccionado, setEventoSeleccionado] = useState<EventoPublico | null>(null)
   const [filtroBusqueda, setFiltroBusqueda] = useState('')
 
@@ -109,7 +130,7 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
   const [emailInput, setEmailInput] = useState('')
   
   // Campos específicos Estudiante / Egresado
-  const [carreraInput, setCarreraInput] = useState(PROGRAMAS_ACADEMICOS[0])
+  const [carreraInput, setCarreraInput] = useState(programasDisponibles[0])
   const [semestreInput, setSemestreInput] = useState('6to Semestre')
   const [asignaturaInput, setAsignaturaInput] = useState(
     asignaturas.length > 0 ? asignaturas[0].nombre : ASIGNATURAS_FALLBACK[0]
@@ -163,7 +184,7 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
     setNombreInput('')
     setCelularInput('')
     setEmailInput('')
-    setCarreraInput(PROGRAMAS_ACADEMICOS[0])
+    setCarreraInput(programasDisponibles[0])
     setSemestreInput('6to Semestre')
     setAsignaturaInput(
       asignaturas.length > 0 ? asignaturas[0].nombre : ASIGNATURAS_FALLBACK[0]
@@ -760,7 +781,7 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
                               required
                               className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#0B305B] rounded-xl outline-none text-xs font-semibold text-slate-800 cursor-pointer"
                             >
-                              {PROGRAMAS_ACADEMICOS.map((prog) => (
+                              {programasDisponibles.map((prog) => (
                                 <option key={prog} value={prog}>
                                   {prog}
                                 </option>
@@ -850,7 +871,7 @@ export default function CatalogoEventosPublico({ eventos, asignaturas = [] }: Pr
                             required
                             className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#0B305B] rounded-xl outline-none text-xs font-semibold text-slate-800 cursor-pointer"
                           >
-                            {PROGRAMAS_ACADEMICOS.map((prog) => (
+                            {programasDisponibles.map((prog) => (
                               <option key={prog} value={prog}>
                                 {prog}
                               </option>
