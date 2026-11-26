@@ -16,6 +16,7 @@ import {
   ListPlus,
   ChevronUp,
   ChevronDown,
+  ArrowUpDown,
 } from 'lucide-react'
 import {
   crearAsignatura,
@@ -88,11 +89,35 @@ export default function GestionAsignaturasCliente({
       .filter(Boolean)
   }, [textoMasivo])
 
-  // Estados de carga y mensajes
+  // Estados de carga, ordenamiento y mensajes
   const [catalogoExpandido, setCatalogoExpandido] = useState(true)
+  const [columnaOrden, setColumnaOrden] = useState<'nombre' | 'programa' | 'estado'>('nombre')
+  const [direccionOrden, setDireccionOrden] = useState<'asc' | 'desc'>('asc')
   const [cargando, setCargando] = useState(false)
   const [mensajeExito, setMensajeExito] = useState<string | null>(null)
   const [mensajeError, setMensajeError] = useState<string | null>(null)
+
+  const alternarOrden = (columna: 'nombre' | 'programa' | 'estado') => {
+    if (columna === columnaOrden) {
+      setDireccionOrden((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setColumnaOrden(columna)
+      setDireccionOrden('asc')
+    }
+  }
+
+  const renderIconoOrden = (columna: 'nombre' | 'programa' | 'estado') => {
+    if (columnaOrden !== columna) {
+      return (
+        <ArrowUpDown className="w-3.5 h-3.5 opacity-40 group-hover:opacity-90 transition-opacity shrink-0" />
+      )
+    }
+    return direccionOrden === 'asc' ? (
+      <ChevronUp className="w-4 h-4 text-sky-300 shrink-0" />
+    ) : (
+      <ChevronDown className="w-4 h-4 text-sky-300 shrink-0" />
+    )
+  }
 
   const mostrarMensaje = (exito: boolean, texto: string) => {
     if (exito) {
@@ -106,7 +131,7 @@ export default function GestionAsignaturasCliente({
     }
   }
 
-  // Filtrado reactivo y ordenamiento alfabético permanente (A → Z)
+  // Filtrado reactivo y ordenamiento dinámico según columna y dirección
   const asignaturasFiltradas = asignaturas
     .filter((asig) => {
       const coincideBusqueda =
@@ -116,7 +141,28 @@ export default function GestionAsignaturasCliente({
         filtroPrograma === 'todos' || asig.programa_academico === filtroPrograma
       return coincideBusqueda && coincidePrograma
     })
-    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }))
+    .sort((a, b) => {
+      const factor = direccionOrden === 'asc' ? 1 : -1
+
+      if (columnaOrden === 'nombre') {
+        return factor * a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })
+      }
+
+      if (columnaOrden === 'programa') {
+        const cmpProg = a.programa_academico.localeCompare(
+          b.programa_academico,
+          'es',
+          { sensitivity: 'base' }
+        )
+        if (cmpProg !== 0) return factor * cmpProg
+        return a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })
+      }
+
+      if (a.activa !== b.activa) {
+        return direccionOrden === 'asc' ? (a.activa ? -1 : 1) : a.activa ? 1 : -1
+      }
+      return a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })
+    })
 
   // 1. Crear Asignatura
   const handleCrear = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -365,9 +411,33 @@ export default function GestionAsignaturasCliente({
           <table className="w-full text-left text-xs">
             <thead className="bg-[#0B305B] text-white border-b-2 border-[#D2202E]">
               <tr>
-                <th className="py-3.5 px-4 font-bold">Nombre de la Asignatura</th>
-                <th className="py-3.5 px-4 font-bold">Programa Académico</th>
-                <th className="py-3.5 px-4 font-bold text-center">Estado (Interruptor)</th>
+                <th
+                  onClick={() => alternarOrden('nombre')}
+                  className="py-3.5 px-4 font-bold cursor-pointer select-none group hover:text-sky-200 transition-colors"
+                >
+                  <div className="inline-flex items-center gap-1.5">
+                    <span>Nombre de la Asignatura</span>
+                    {renderIconoOrden('nombre')}
+                  </div>
+                </th>
+                <th
+                  onClick={() => alternarOrden('programa')}
+                  className="py-3.5 px-4 font-bold cursor-pointer select-none group hover:text-sky-200 transition-colors"
+                >
+                  <div className="inline-flex items-center gap-1.5">
+                    <span>Programa Académico</span>
+                    {renderIconoOrden('programa')}
+                  </div>
+                </th>
+                <th
+                  onClick={() => alternarOrden('estado')}
+                  className="py-3.5 px-4 font-bold text-center cursor-pointer select-none group hover:text-sky-200 transition-colors"
+                >
+                  <div className="inline-flex items-center justify-center gap-1.5">
+                    <span>Estado (Interruptor)</span>
+                    {renderIconoOrden('estado')}
+                  </div>
+                </th>
                 <th className="py-3.5 px-4 font-bold text-right">Acciones</th>
               </tr>
             </thead>
