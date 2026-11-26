@@ -29,7 +29,7 @@ export default async function AsignaturasPage() {
   const [asignaturas, programas] = await Promise.all([
     prisma.asignatura.findMany({
       where: filtroAsignaturas,
-      orderBy: [{ programa_academico: 'asc' }, { nombre: 'asc' }],
+      orderBy: { nombre: 'asc' },
     }),
     prisma.programa.findMany({
       where: { estado_activo: true },

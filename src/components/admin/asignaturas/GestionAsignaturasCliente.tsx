@@ -14,6 +14,8 @@ import {
   GraduationCap,
   Filter,
   ListPlus,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react'
 import {
   crearAsignatura,
@@ -87,6 +89,7 @@ export default function GestionAsignaturasCliente({
   }, [textoMasivo])
 
   // Estados de carga y mensajes
+  const [catalogoExpandido, setCatalogoExpandido] = useState(true)
   const [cargando, setCargando] = useState(false)
   const [mensajeExito, setMensajeExito] = useState<string | null>(null)
   const [mensajeError, setMensajeError] = useState<string | null>(null)
@@ -103,15 +106,17 @@ export default function GestionAsignaturasCliente({
     }
   }
 
-  // Filtrado reactivo
-  const asignaturasFiltradas = asignaturas.filter((asig) => {
-    const coincideBusqueda =
-      asig.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      asig.programa_academico.toLowerCase().includes(busqueda.toLowerCase())
-    const coincidePrograma =
-      filtroPrograma === 'todos' || asig.programa_academico === filtroPrograma
-    return coincideBusqueda && coincidePrograma
-  })
+  // Filtrado reactivo y ordenamiento alfabético permanente (A → Z)
+  const asignaturasFiltradas = asignaturas
+    .filter((asig) => {
+      const coincideBusqueda =
+        asig.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+        asig.programa_academico.toLowerCase().includes(busqueda.toLowerCase())
+      const coincidePrograma =
+        filtroPrograma === 'todos' || asig.programa_academico === filtroPrograma
+      return coincideBusqueda && coincidePrograma
+    })
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }))
 
   // 1. Crear Asignatura
   const handleCrear = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -256,7 +261,10 @@ export default function GestionAsignaturasCliente({
             <input
               type="text"
               value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
+              onChange={(e) => {
+                setBusqueda(e.target.value)
+                setCatalogoExpandido(true)
+              }}
               placeholder="Buscar materia..."
               className="w-full pl-9 pr-3.5 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs outline-none transition"
             />
@@ -267,7 +275,10 @@ export default function GestionAsignaturasCliente({
             <Filter className="w-4 h-4 text-[#D2202E] shrink-0" />
             <select
               value={filtroPrograma}
-              onChange={(e) => setFiltroPrograma(e.target.value)}
+              onChange={(e) => {
+                setFiltroPrograma(e.target.value)
+                setCatalogoExpandido(true)
+              }}
               className="w-full sm:w-60 px-3 py-2 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl text-xs font-bold text-slate-700 outline-none cursor-pointer transition"
             >
               <option value="todos">Todos los Programas Académicos</option>
@@ -311,7 +322,11 @@ export default function GestionAsignaturasCliente({
 
       {/* Tabla Limpia de Asignaturas */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+        <div
+          className={`p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+            catalogoExpandido ? 'border-b border-slate-100' : ''
+          }`}
+        >
           <div>
             <h3 className="text-sm font-bold text-[#0B305B] flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-[#D2202E]" />
@@ -321,11 +336,31 @@ export default function GestionAsignaturasCliente({
               Control de disponibilidad de asignaturas que los alumnos pueden postular para bonificación
             </p>
           </div>
-          <span className="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-xl">
-            {asignaturasFiltradas.length} Materias
-          </span>
+          <div className="flex items-center gap-2.5 self-start sm:self-auto">
+            <span className="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-xl">
+              {asignaturasFiltradas.length} Materias
+            </span>
+            <button
+              type="button"
+              onClick={() => setCatalogoExpandido((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-[#0B305B] bg-slate-50 hover:bg-slate-100 border border-slate-200 transition cursor-pointer"
+            >
+              {catalogoExpandido ? (
+                <>
+                  <ChevronUp className="w-3.5 h-3.5 text-[#D2202E]" />
+                  <span>Contraer</span>
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-3.5 h-3.5 text-[#D2202E]" />
+                  <span>Mostrar listado</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
+        {catalogoExpandido && (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-[#0B305B] text-white border-b-2 border-[#D2202E]">
@@ -418,6 +453,7 @@ export default function GestionAsignaturasCliente({
             </tbody>
           </table>
         </div>
+        )}
       </div>
 
       {/* ========================================================================= */}
