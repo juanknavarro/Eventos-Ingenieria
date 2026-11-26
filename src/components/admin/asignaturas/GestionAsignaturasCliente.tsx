@@ -31,6 +31,10 @@ export interface AsignaturaItem {
 
 interface Props {
   asignaturasIniciales: AsignaturaItem[]
+  usuarioActual?: {
+    rol: string
+    programa: string | null
+  }
 }
 
 export const PROGRAMAS_DISPONIBLES = [
@@ -42,7 +46,16 @@ export const PROGRAMAS_DISPONIBLES = [
   'Ciencias Básicas de Ingeniería',
 ]
 
-export default function GestionAsignaturasCliente({ asignaturasIniciales }: Props) {
+export default function GestionAsignaturasCliente({
+  asignaturasIniciales,
+  usuarioActual,
+}: Props) {
+  const esAdminPrograma = usuarioActual?.rol === 'ADMIN'
+  const programaUsuario = usuarioActual?.programa?.trim() || ''
+  const opcionesProgramas =
+    programaUsuario && !PROGRAMAS_DISPONIBLES.includes(programaUsuario)
+      ? [programaUsuario, ...PROGRAMAS_DISPONIBLES]
+      : PROGRAMAS_DISPONIBLES
   const [asignaturas, setAsignaturas] = useState<AsignaturaItem[]>(asignaturasIniciales)
   const [busqueda, setBusqueda] = useState('')
   const [filtroPrograma, setFiltroPrograma] = useState('todos')
@@ -372,17 +385,34 @@ export default function GestionAsignaturasCliente({ asignaturasIniciales }: Prop
                 <label className="font-bold text-slate-800">
                   Programa Académico <span className="text-[#D2202E]">*</span>
                 </label>
-                <select
-                  name="programa_academico"
-                  required
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none text-xs font-bold text-slate-800 cursor-pointer"
-                >
-                  {PROGRAMAS_DISPONIBLES.map((prog) => (
-                    <option key={prog} value={prog}>
-                      {prog}
-                    </option>
-                  ))}
-                </select>
+                {esAdminPrograma && programaUsuario ? (
+                  <>
+                    <input type="hidden" name="programa_academico" value={programaUsuario} />
+                    <select
+                      value={programaUsuario}
+                      disabled
+                      className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl outline-none text-xs font-bold text-slate-600 cursor-not-allowed"
+                    >
+                      {opcionesProgramas.map((prog) => (
+                        <option key={prog} value={prog}>
+                          {prog}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                ) : (
+                  <select
+                    name="programa_academico"
+                    required
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none text-xs font-bold text-slate-800 cursor-pointer"
+                  >
+                    {opcionesProgramas.map((prog) => (
+                      <option key={prog} value={prog}>
+                        {prog}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-slate-100">
@@ -446,18 +476,35 @@ export default function GestionAsignaturasCliente({ asignaturasIniciales }: Prop
 
               <div className="space-y-1">
                 <label className="font-bold text-slate-800">Programa Académico</label>
-                <select
-                  name="programa_academico"
-                  defaultValue={asignaturaAEditar.programa_academico}
-                  required
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none text-xs font-bold text-slate-800 cursor-pointer"
-                >
-                  {PROGRAMAS_DISPONIBLES.map((prog) => (
-                    <option key={prog} value={prog}>
-                      {prog}
-                    </option>
-                  ))}
-                </select>
+                {esAdminPrograma && programaUsuario ? (
+                  <>
+                    <input type="hidden" name="programa_academico" value={programaUsuario} />
+                    <select
+                      value={programaUsuario}
+                      disabled
+                      className="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl outline-none text-xs font-bold text-slate-600 cursor-not-allowed"
+                    >
+                      {opcionesProgramas.map((prog) => (
+                        <option key={prog} value={prog}>
+                          {prog}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                ) : (
+                  <select
+                    name="programa_academico"
+                    defaultValue={asignaturaAEditar.programa_academico}
+                    required
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#0B305B] focus:bg-white rounded-xl outline-none text-xs font-bold text-slate-800 cursor-pointer"
+                  >
+                    {opcionesProgramas.map((prog) => (
+                      <option key={prog} value={prog}>
+                        {prog}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-slate-100">

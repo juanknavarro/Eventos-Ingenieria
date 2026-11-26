@@ -109,7 +109,13 @@ export default async function AsignaturasPage() {
         </div>
 
         {/* Módulo Cliente con Tabla, Botón '+ Agregar Asignatura', Modales y Toggle */}
-        <GestionAsignaturasCliente asignaturasIniciales={asignaturasMapeadas} />
+        <GestionAsignaturasCliente
+          asignaturasIniciales={asignaturasMapeadas}
+          usuarioActual={{
+            rol: session.rol,
+            programa: session.carrera,
+          }}
+        />
       </main>
     </div>
   )

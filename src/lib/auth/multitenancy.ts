@@ -136,7 +136,11 @@ export function filtroAsignaturasPorTenancy(session: AuthSessionUser): Prisma.As
   return {
     OR: [
       { programa_academico: programa },
-      { programa_academico: 'Ciencias Básicas' },
+      {
+        programa_academico: {
+          in: ['Ciencias Básicas de Ingeniería', 'Ciencias Básicas'],
+        },
+      },
     ],
   }
 }

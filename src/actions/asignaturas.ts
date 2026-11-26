@@ -16,13 +16,38 @@ async function verificarAdmin() {
 
 export async function crearAsignatura(formData: FormData) {
   try {
-    await verificarAdmin()
+    const session = await verificarAdmin()
 
     const nombre = (formData.get('nombre') as string)?.trim()
-    const programa_academico = (formData.get('programa_academico') as string)?.trim()
+    let programa_academico = (formData.get('programa_academico') as string)?.trim()
+
+    if (session.rol === RolUsuario.ADMIN) {
+      const programaSession = session.carrera?.trim()
+      if (!programaSession) {
+        return {
+          success: false,
+          error: 'Tu usuario administrador no tiene un programa académico asignado.',
+        }
+      }
+      programa_academico = programaSession
+    }
 
     if (!nombre || !programa_academico) {
       return { success: false, error: 'Todos los campos son obligatorios.' }
+    }
+
+    const duplicada = await prisma.asignatura.findFirst({
+      where: {
+        nombre: { equals: nombre, mode: 'insensitive' },
+        programa_academico: { equals: programa_academico, mode: 'insensitive' },
+      },
+    })
+
+    if (duplicada) {
+      return {
+        success: false,
+        error: 'Esta asignatura ya está registrada en ese programa académico.',
+      }
     }
 
     const nueva = await prisma.asignatura.create({
@@ -55,17 +80,56 @@ export async function actualizarAsignatura(
   programa_academico: string
 ) {
   try {
-    await verificarAdmin()
+    const session = await verificarAdmin()
 
-    if (!id || !nombre?.trim() || !programa_academico?.trim()) {
+    const nombreLimpio = nombre?.trim()
+    let programaFinal = programa_academico?.trim()
+
+    if (session.rol === RolUsuario.ADMIN) {
+      const programaSession = session.carrera?.trim()
+      if (!programaSession) {
+        return {
+          success: false,
+          error: 'Tu usuario administrador no tiene un programa académico asignado.',
+        }
+      }
+      const existente = await prisma.asignatura.findUnique({ where: { id } })
+      if (
+        !existente ||
+        existente.programa_academico.toLowerCase() !== programaSession.toLowerCase()
+      ) {
+        return {
+          success: false,
+          error: 'No tienes permisos para editar asignaturas de otro programa académico.',
+        }
+      }
+      programaFinal = programaSession
+    }
+
+    if (!id || !nombreLimpio || !programaFinal) {
       return { success: false, error: 'Datos incompletos para actualizar.' }
+    }
+
+    const duplicada = await prisma.asignatura.findFirst({
+      where: {
+        id: { not: id },
+        nombre: { equals: nombreLimpio, mode: 'insensitive' },
+        programa_academico: { equals: programaFinal, mode: 'insensitive' },
+      },
+    })
+
+    if (duplicada) {
+      return {
+        success: false,
+        error: 'Esta asignatura ya está registrada en ese programa académico.',
+      }
     }
 
     const actualizada = await prisma.asignatura.update({
       where: { id },
       data: {
-        nombre: nombre.trim(),
-        programa_academico: programa_academico.trim(),
+        nombre: nombreLimpio,
+        programa_academico: programaFinal,
       },
     })
 
@@ -87,10 +151,25 @@ export async function actualizarAsignatura(
 
 export async function alternarEstadoAsignatura(id: string, nuevoEstado: boolean) {
   try {
-    await verificarAdmin()
+    const session = await verificarAdmin()
 
     if (!id) {
       return { success: false, error: 'Identificador de asignatura inválido.' }
+    }
+
+    if (session.rol === RolUsuario.ADMIN) {
+      const programaSession = session.carrera?.trim()
+      const existente = await prisma.asignatura.findUnique({ where: { id } })
+      if (
+        !programaSession ||
+        !existente ||
+        existente.programa_academico.toLowerCase() !== programaSession.toLowerCase()
+      ) {
+        return {
+          success: false,
+          error: 'No tienes permisos para modificar asignaturas de otro programa académico.',
+        }
+      }
     }
 
     const actualizada = await prisma.asignatura.update({
@@ -118,10 +197,25 @@ export async function alternarEstadoAsignatura(id: string, nuevoEstado: boolean)
 
 export async function eliminarAsignatura(id: string) {
   try {
-    await verificarAdmin()
+    const session = await verificarAdmin()
 
     if (!id) {
       return { success: false, error: 'Identificador de asignatura inválido.' }
+    }
+
+    if (session.rol === RolUsuario.ADMIN) {
+      const programaSession = session.carrera?.trim()
+      const existente = await prisma.asignatura.findUnique({ where: { id } })
+      if (
+        !programaSession ||
+        !existente ||
+        existente.programa_academico.toLowerCase() !== programaSession.toLowerCase()
+      ) {
+        return {
+          success: false,
+          error: 'No tienes permisos para eliminar asignaturas de otro programa académico.',
+        }
+      }
     }
 
     await prisma.asignatura.delete({
