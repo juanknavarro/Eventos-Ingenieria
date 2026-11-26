@@ -37,8 +37,17 @@ import {
   Award,
   QrCode,
   Type,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { RolUsuario, EstadoEvento } from '@prisma/client'
+import { exportarAsistentesEventoExcel } from '@/actions/reportes'
+import {
+  crearWorkbookExcel,
+  aplicarBannerInstitucional,
+  estilizarTablaCorporativa,
+  descargarWorkbookExcel,
+  traducirEtiquetaExcel,
+} from '@/lib/excel/estilosExcel'
 import {
   eliminarEvento,
   cambiarRolUsuario,
@@ -133,6 +142,8 @@ export default function PanelAdminCliente({
   totalRecaudadoInicial = 0,
 }: Props) {
   const esSuperAdmin = adminActual.rol === 'SUPER_ADMIN'
+  const puedeExportarExcel =
+    adminActual.rol === 'ADMIN' || adminActual.rol === 'SUPER_ADMIN'
   const [tabActiva, setTabActiva] = useState<'eventos' | 'usuarios' | 'plantillas'>('eventos')
   const [programaSeleccionado, setProgramaSeleccionado] = useState<string>('todos')
 
@@ -140,6 +151,7 @@ export default function PanelAdminCliente({
   const [mensajeExito, setMensajeExito] = useState<string | null>(null)
   const [mensajeError, setMensajeError] = useState<string | null>(null)
   const [cargandoAccion, setCargandoAccion] = useState(false)
+  const [exportandoEventoId, setExportandoEventoId] = useState<string | null>(null)
 
   // Estado de Modal de Registro de Personal (Profesor / Staff)
   const [modalPersonalAbierto, setModalPersonalAbierto] = useState(false)
@@ -224,6 +236,177 @@ export default function PanelAdminCliente({
       setMensajeExito(null)
       setMensajeError(null)
     }, 4500)
+  }
+
+  // Exportar sábana completa de asistentes del evento a Excel (.xlsx) con diseño corporativo ExcelJS
+  const handleExportarAsistentesExcel = async (eventoId: string) => {
+    if (!puedeExportarExcel || exportandoEventoId) return
+    setExportandoEventoId(eventoId)
+    try {
+      const res = await exportarAsistentesEventoExcel(eventoId)
+      if (!res.success) {
+        mostrarMensaje(false, res.error || 'No se pudo exportar la lista de asistentes.')
+        return
+      }
+
+      const fechaEventoTexto = new Date(res.evento.fechaInicio).toLocaleDateString('es-CO', {
+        timeZone: 'America/Bogota',
+        dateStyle: 'long',
+      })
+      const fechaGeneracion = new Date().toLocaleString('es-CO', {
+        timeZone: 'America/Bogota',
+        dateStyle: 'short',
+        timeStyle: 'short',
+      })
+
+      const totalInscritos = res.filas.length
+      const totalPagadosExentos = res.filas.filter(
+        (f) => f.estadoPago === 'PAGADO' || f.estadoPago === 'EXENTO'
+      ).length
+      const totalAsistentesPuerta = res.filas.filter((f) => f.asistenciasRegistradas > 0).length
+      const totalAptos = res.filas.filter((f) => f.estadoCertificacion === 'Apto').length
+      const totalRecaudado = res.filas.reduce(
+        (acc, f) => acc + (f.estadoPago === 'PAGADO' ? f.montoPagado : 0),
+        0
+      )
+
+      const encabezados = [
+        '#',
+        'Cédula / Documento',
+        'Código Estudiantil',
+        'Nombre Completo',
+        'Correo Electrónico',
+        'Celular',
+        'Tipo de Vinculación',
+        'Programa / Carrera',
+        'Semestre',
+        'Asignatura Bonificación',
+        'Empresa / Institución',
+        'País',
+        'Departamento',
+        'Ciudad',
+        'Fecha de Inscripción',
+        'Estado de Pago',
+        'Método de Pago',
+        'Monto Pagado (COP)',
+        'Referencia CUS / Comprobante',
+        'Docente Responsable Recaudo',
+        'Asistencias Registradas',
+        'Asistencias Mínimas Requeridas',
+        'Detalle de Ingresos (Jornada / Método / Hora)',
+        'Estado Certificación',
+      ]
+
+      const workbook = await crearWorkbookExcel()
+      const sheet = workbook.addWorksheet('Asistentes')
+
+      aplicarBannerInstitucional(
+        sheet,
+        `Sábana Oficial de Asistentes — ${res.evento.titulo}`,
+        `Fecha del evento: ${fechaEventoTexto} | Ubicación: ${res.evento.ubicacion} | Generado: ${fechaGeneracion}`,
+        encabezados.length
+      )
+
+      // Fila resumen de indicadores del evento (filas 5-6) antes de la tabla principal
+      const filaResumenTitulo = sheet.getRow(5)
+      filaResumenTitulo.height = 20
+      const indicadores = [
+        { col: 1, label: 'Total Inscritos', valor: totalInscritos, esMoneda: false },
+        { col: 3, label: 'Pagados / Exentos', valor: totalPagadosExentos, esMoneda: false },
+        { col: 5, label: 'Asistentes en Puerta', valor: totalAsistentesPuerta, esMoneda: false },
+        { col: 7, label: 'Aptos Certificado', valor: totalAptos, esMoneda: false },
+        { col: 9, label: 'Total Recaudado', valor: totalRecaudado, esMoneda: true },
+      ]
+
+      const filaResumenValor = sheet.getRow(6)
+      filaResumenValor.height = 22
+      indicadores.forEach((ind) => {
+        sheet.mergeCells(5, ind.col, 5, ind.col + 1)
+        sheet.mergeCells(6, ind.col, 6, ind.col + 1)
+
+        const cLabel = filaResumenTitulo.getCell(ind.col)
+        cLabel.value = ind.label
+        cLabel.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } }
+        cLabel.font = { name: 'Calibri', size: 9, bold: true, color: { argb: 'FF334155' } }
+        cLabel.alignment = { horizontal: 'center', vertical: 'middle' }
+
+        const cVal = filaResumenValor.getCell(ind.col)
+        cVal.value = ind.valor
+        cVal.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } }
+        cVal.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF0F172A' } }
+        cVal.alignment = { horizontal: 'center', vertical: 'middle' }
+        cVal.numFmt = ind.esMoneda ? '$ #,##0' : '#,##0'
+      })
+
+      const filasDatos = res.filas.map((f) => [
+        f.consecutivo,
+        f.cedula,
+        f.codigoEstudiantil,
+        f.nombreCompleto,
+        f.email,
+        f.celular,
+        traducirEtiquetaExcel(f.tipoVinculacion),
+        f.carrera,
+        f.semestre,
+        f.asignaturaBonificacion,
+        f.empresa,
+        f.pais,
+        f.departamento,
+        f.ciudad,
+        f.fechaInscripcion,
+        f.estadoPago,
+        traducirEtiquetaExcel(f.metodoPago),
+        f.montoPagado,
+        f.comprobanteUrl,
+        f.docenteResponsable,
+        f.asistenciasRegistradas,
+        f.asistenciasMinimas,
+        f.detalleIngresos
+          .replace(/\bCODIGO_BARRAS\b/g, 'Código de Barras')
+          .replace(/\bMANUAL\b/g, 'Manual')
+          .replace(/\bBIOMETRICO\b/g, 'Biométrico'),
+        f.estadoCertificacion,
+      ])
+
+      estilizarTablaCorporativa(sheet, {
+        filaEncabezado: 8,
+        encabezados,
+        filas: filasDatos,
+        columnasEntero: [1, 21, 22],
+        columnasMoneda: [18],
+        columnasEstado: [16, 24],
+        inmovilizar: true,
+        conAutoFiltro: true,
+      })
+
+      const nombreSeguro = res.evento.titulo
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 40)
+
+      const fechaArchivo = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Bogota',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date())
+
+      await descargarWorkbookExcel(
+        workbook,
+        `Asistentes_${nombreSeguro || 'Evento'}_${fechaArchivo}.xlsx`
+      )
+      mostrarMensaje(
+        true,
+        `Archivo Excel generado (${res.filas.length} registro(s)) para "${res.evento.titulo}".`
+      )
+    } catch (err) {
+      console.error('Error generando Excel de asistentes:', err)
+      mostrarMensaje(false, 'Error inesperado al generar el archivo Excel.')
+    } finally {
+      setExportandoEventoId(null)
+    }
   }
 
   // Manejo de guardado interactivo de plantillas PDF
@@ -642,29 +825,51 @@ export default function PanelAdminCliente({
                   </div>
 
                   {/* Acciones del Evento */}
-                  <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
-                    <Link
-                      href={`/admin/eventos/${evento.id}/escaner`}
-                      className="py-1.5 px-3 bg-[#0B305B] hover:bg-[#07213e] text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
-                      title="Abrir Escáner QR de Asistencia"
-                    >
-                      <QrCode className="w-3.5 h-3.5 text-white" />
-                      <span className="hidden sm:inline">Escanear QR</span>
-                    </Link>
-                    <Link
-                      href={`/admin/eventos/nuevo?id=${evento.id}`}
-                      className="flex-1 py-1.5 px-3 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <Edit2 className="w-3.5 h-3.5 text-[#0B305B]" />
-                      Editar
-                    </Link>
-                    <button
-                      onClick={() => handleEliminarEvento(evento.id, evento.titulo)}
-                      disabled={cargandoAccion}
-                      className="py-1.5 px-3 bg-white hover:bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                  <div className="p-3 bg-slate-50 border-t border-slate-100 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Link
+                        href={`/admin/eventos/${evento.id}/escaner`}
+                        className="py-1.5 px-3 bg-[#0B305B] hover:bg-[#07213e] text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                        title="Abrir Escáner QR de Asistencia"
+                      >
+                        <QrCode className="w-3.5 h-3.5 text-white" />
+                        <span className="hidden sm:inline">Escanear QR</span>
+                      </Link>
+                      <Link
+                        href={`/admin/eventos/nuevo?id=${evento.id}`}
+                        className="flex-1 py-1.5 px-3 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Edit2 className="w-3.5 h-3.5 text-[#0B305B]" />
+                        Editar
+                      </Link>
+                      <button
+                        onClick={() => handleEliminarEvento(evento.id, evento.titulo)}
+                        disabled={cargandoAccion}
+                        className="py-1.5 px-3 bg-white hover:bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {puedeExportarExcel && (
+                      <button
+                        type="button"
+                        onClick={() => handleExportarAsistentesExcel(evento.id)}
+                        disabled={exportandoEventoId === evento.id}
+                        className="w-full py-1.5 px-3 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                      >
+                        {exportandoEventoId === evento.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-200" />
+                        )}
+                        <span>
+                          {exportandoEventoId === evento.id
+                            ? 'Generando Excel...'
+                            : 'Exportar Asistentes (.xlsx)'}
+                        </span>
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

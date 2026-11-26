@@ -90,12 +90,20 @@ export default async function ReportesPage() {
       usuarioCedula: ins.usuario.cedula || ins.usuario.codigoEstudiantil,
       usuarioCarrera: ins.usuario.carrera,
       usuarioSemestre: ins.usuario.semestre,
+      celular: ins.celular || ins.usuario.telefono || null,
+      tipoVinculacion: ins.tipo_vinculacion || ins.usuario.tipo_vinculacion || null,
+      empresa: ins.empresa || ins.usuario.empresa || null,
+      pais: ins.pais || ins.usuario.pais || null,
+      departamento: ins.departamento || ins.usuario.departamento || null,
+      ciudad: ins.ciudad || ins.usuario.ciudad || null,
       asignaturaBonificacion: ins.asignatura_bonificacion,
       profesorNombre:
         ins.profesorResponsable?.nombre ||
         ins.profesor_responsable_dinero ||
         'Sin Docente Asignado',
       estadoPago: ins.estado_pago,
+      metodoPago: ins.metodo_pago || null,
+      comprobanteUrl: ins.comprobanteUrl || null,
       montoPagado: ins.montoPagado,
       fechaInscripcion: ins.fechaInscripcion.toISOString(),
       asistencias: ins.asistencias.map((a) => ({

@@ -1,7 +1,13 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
-import * as XLSX from 'xlsx'
+import {
+  crearWorkbookExcel,
+  aplicarBannerInstitucional,
+  estilizarTablaCorporativa,
+  descargarWorkbookExcel,
+  traducirEtiquetaExcel,
+} from '@/lib/excel/estilosExcel'
 import {
   BarChart,
   Bar,
@@ -79,9 +85,17 @@ export interface InscripcionReporte {
   usuarioCedula: string | null
   usuarioCarrera: string | null
   usuarioSemestre: string | null
+  celular?: string | null
+  tipoVinculacion?: string | null
+  empresa?: string | null
+  pais?: string | null
+  departamento?: string | null
+  ciudad?: string | null
   asignaturaBonificacion: string | null
   profesorNombre: string
   estadoPago: string
+  metodoPago?: string | null
+  comprobanteUrl?: string | null
   montoPagado: number
   fechaInscripcion: Date | string
   asistencias?: AsistenciaItemReporte[]
@@ -436,25 +450,35 @@ export default function DashboardReportesCliente({
     }))
   }, [inscripcionesFiltradas])
 
-  // Exportar archivo estructurado Excel con tres hojas
-  const handleExportarExcel = () => {
-    const wb = XLSX.utils.book_new()
+  // Exportar archivo estructurado Excel con tres hojas corporativas usando ExcelJS
+  const handleExportarExcel = async () => {
+    const workbook = await crearWorkbookExcel()
 
-    // HOJA 1: Resumen Financiero
     const eventoInfo =
       eventoFiltro === 'todos'
         ? 'Consolidado General — Todos los Eventos'
         : eventos.find((e) => e.id === eventoFiltro)?.titulo || 'Evento Seleccionado'
 
-    const hoja1Datos = [
-      ['REPORTE FINANCIERO Y AUDITORÍA DE EVENTOS — UNIVERSIDAD DEL SINÚ'],
-      ['Facultad de Ciencias e Ingenierías'],
-      ['Fecha de Generación:', new Date().toLocaleString('es-CO')],
-      ['Evento Consultado:', eventoInfo],
-      ['Vigencia / Período:', anioFiltro === 'todos' ? 'Histórico Completo' : (semestreFiltro === 'todos' ? `Año ${anioFiltro} (Completo)` : `Año ${anioFiltro} — Semestre ${semestreFiltro}`)],
-      [],
-      ['INDICADOR / MÉTRICA', 'VALOR'],
-      ['Total Recaudado (Efectivo)', `$${kpis.totalRecaudado.toLocaleString('es-CO')} COP`],
+    const vigenciaTexto =
+      anioFiltro === 'todos'
+        ? 'Histórico Completo'
+        : semestreFiltro === 'todos'
+        ? `Año ${anioFiltro} (Completo)`
+        : `Año ${anioFiltro} — Semestre ${semestreFiltro}`
+
+    const subtituloComun = `Evento: ${eventoInfo} | Vigencia: ${vigenciaTexto} | Generado: ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}`
+
+    // HOJA 1: Resumen Financiero
+    const ws1 = workbook.addWorksheet('Resumen Financiero')
+    aplicarBannerInstitucional(
+      ws1,
+      'Reporte Financiero y Auditoría de Eventos',
+      subtituloComun,
+      3
+    )
+
+    const filasKpis: (string | number)[][] = [
+      ['Total Recaudado (Efectivo + Transferencias)', `$${kpis.totalRecaudado.toLocaleString('es-CO')} COP`],
       ['Monto Pendiente por Cobrar', `$${kpis.montoPendiente.toLocaleString('es-CO')} COP`],
       ['Total de Estudiantes Preinscritos', kpis.totalInscritos],
       ['Inscripciones Pagadas (Confirmadas)', kpis.pagadosCount],
@@ -464,110 +488,165 @@ export default function DashboardReportesCliente({
       ['Tasa de Efectividad de Asistencia', `${kpis.tasaAsistencia.toFixed(1)}%`],
       ['Capacidad Máxima Registrada', datosAforo.capacidad > 0 ? `${datosAforo.capacidad} cupos` : 'No definida'],
       ['Porcentaje de Aforo Cubierto', `${datosAforo.porcentaje}%`],
-      [],
-      ['DESGLOSE DE RECAUDO POR DOCENTE RESPONSABLE'],
-      ['Docente / Profesor', 'Alumnos Asignados', 'Total Recaudado (COP)'],
-      ...datosRecaudoPorProfesor.map((d) => [
-        d.profesor,
-        d.alumnos,
-        d.recaudado,
-      ]),
     ]
-    const ws1 = XLSX.utils.aoa_to_sheet(hoja1Datos)
-    XLSX.utils.book_append_sheet(wb, ws1, 'Resumen Financiero')
 
-    // HOJA 2: Listado General de Inscritos
-    const hoja2Datos = [
-      ['LISTADO GENERAL DE INSCRITOS Y AUDITORÍA — UNIVERSIDAD DEL SINÚ'],
-      ['Facultad de Ciencias e Ingenierías'],
-      ['Fecha de Generación:', new Date().toLocaleString('es-CO')],
-      ['Evento Consultado:', eventoInfo],
-      ['Vigencia / Período:', anioFiltro === 'todos' ? 'Histórico Completo' : (semestreFiltro === 'todos' ? `Año ${anioFiltro} (Completo)` : `Año ${anioFiltro} — Semestre ${semestreFiltro}`)],
-      [],
-      [
-        'Cédula / ID',
-        'Nombre del Estudiante',
-        'Correo Institucional',
-        'Programa Académico',
-        'Semestre',
-        'Evento Académico',
-        'Asignatura Bonificación',
-        'Docente Recaudador',
-        'Estado de Pago',
-        'Monto Pagado (COP)',
-        'Fecha de Inscripción',
-      ],
-      ...inscripcionesFiltradas.map((ins) => [
+    const finTablaKpi = estilizarTablaCorporativa(ws1, {
+      filaEncabezado: 5,
+      encabezados: ['INDICADOR / MÉTRICA', 'VALOR', 'OBSERVACIÓN'],
+      filas: filasKpis.map(([indicador, valor]) => [indicador, valor, 'Consolidado del filtro activo']),
+      inmovilizar: false,
+      conAutoFiltro: false,
+    })
+
+    const totalAlumnosDocentes = datosRecaudoPorProfesor.reduce((acc, d) => acc + d.alumnos, 0)
+    const totalRecaudoDocentes = datosRecaudoPorProfesor.reduce((acc, d) => acc + d.recaudado, 0)
+
+    estilizarTablaCorporativa(ws1, {
+      filaEncabezado: finTablaKpi + 2,
+      encabezados: ['Docente / Profesor', 'Alumnos Asignados', 'Total Recaudado (COP)'],
+      filas: datosRecaudoPorProfesor.map((d) => [d.profesor, d.alumnos, d.recaudado]),
+      columnasEntero: [2],
+      columnasMoneda: [3],
+      filaTotales: ['TOTAL CONSOLIDADO', totalAlumnosDocentes, totalRecaudoDocentes],
+      inmovilizar: false,
+      conAutoFiltro: false,
+    })
+
+    // HOJA 2: Listado General
+    const encabezadosHoja2 = [
+      'Cédula / ID',
+      'Nombre Completo',
+      'Correo Electrónico',
+      'Celular',
+      'Tipo de Vinculación',
+      'Programa Académico',
+      'Semestre',
+      'Empresa / Institución',
+      'Ciudad / Departamento',
+      'Evento Académico',
+      'Asignatura Bonificación',
+      'Docente Recaudador',
+      'Estado de Pago',
+      'Método de Pago',
+      'Referencia CUS / Comprobante',
+      'Monto Pagado (COP)',
+      'Fecha de Inscripción',
+    ]
+
+    const ws2 = workbook.addWorksheet('Listado General')
+    aplicarBannerInstitucional(
+      ws2,
+      'Listado General de Inscritos y Auditoría Financiera',
+      subtituloComun,
+      encabezadosHoja2.length
+    )
+
+    const filasHoja2 = inscripcionesFiltradas.map((ins) => {
+      const ubicacionParticipante = [ins.ciudad, ins.departamento].filter(Boolean).join(' / ') || 'N/A'
+      return [
         ins.usuarioCedula || 'N/A',
         ins.usuarioNombre,
         ins.usuarioEmail,
+        ins.celular || 'N/A',
+        traducirEtiquetaExcel(ins.tipoVinculacion, 'Estudiante Activo'),
         ins.usuarioCarrera || 'Facultad de Ingenierías',
         ins.usuarioSemestre || 'N/A',
+        ins.empresa || 'N/A',
+        ubicacionParticipante,
         ins.eventoTitulo,
         ins.asignaturaBonificacion || 'No aplica',
         ins.profesorNombre,
         ins.estadoPago,
+        traducirEtiquetaExcel(ins.metodoPago, ins.eventoPrecio === 0 ? 'Gratuito' : 'N/A'),
+        ins.comprobanteUrl || 'N/A',
         ins.montoPagado,
-        new Date(ins.fechaInscripcion).toLocaleString('es-CO'),
-      ]),
-    ]
-    const ws2 = XLSX.utils.aoa_to_sheet(hoja2Datos)
-    XLSX.utils.book_append_sheet(wb, ws2, 'Listado General')
+        new Date(ins.fechaInscripcion).toLocaleString('es-CO', { timeZone: 'America/Bogota' }),
+      ]
+    })
 
-    // HOJA 3: Auditoría de Asistencia (Check-in en Puerta - Multidía)
+    estilizarTablaCorporativa(ws2, {
+      filaEncabezado: 5,
+      encabezados: encabezadosHoja2,
+      filas: filasHoja2,
+      columnasEstado: [13],
+      columnasMoneda: [16],
+      inmovilizar: true,
+      conAutoFiltro: true,
+    })
+
+    // HOJA 3: Auditoría de Asistencia
+    const encabezadosHoja3 = [
+      'Cédula / ID',
+      'Nombre del Asistente',
+      'Tipo de Vinculación',
+      'Programa Académico',
+      'Evento Validado',
+      'Jornada / Fecha',
+      'Fecha y Hora Check-in',
+      'Método de Escaneo',
+      'Validado Por (Staff / Docente)',
+      'Observaciones de Entrada',
+      'Progreso Asistencias',
+      'Estado Diploma',
+    ]
+
     const filasAuditoria: (string | number)[][] = []
     for (const ins of inscripcionesFiltradas) {
-      const lista = ins.asistencias && ins.asistencias.length > 0 ? ins.asistencias : (ins.asistencia ? [ins.asistencia] : [])
+      const lista =
+        ins.asistencias && ins.asistencias.length > 0
+          ? ins.asistencias
+          : ins.asistencia
+          ? [ins.asistencia]
+          : []
       for (const asis of lista) {
         filasAuditoria.push([
           ins.usuarioCedula || 'N/A',
           ins.usuarioNombre,
+          traducirEtiquetaExcel(ins.tipoVinculacion, 'Estudiante Activo'),
           ins.usuarioCarrera || 'Facultad de Ingenierías',
           ins.eventoTitulo,
           asis.fechaJornada
-            ? new Date(asis.fechaJornada).toLocaleDateString('es-CO')
-            : (asis.fechaHoraRegistro ? new Date(asis.fechaHoraRegistro).toLocaleDateString('es-CO') : 'Día Único'),
-          asis.fechaHoraRegistro ? new Date(asis.fechaHoraRegistro).toLocaleString('es-CO') : '',
-          asis.metodo || 'QR',
+            ? new Date(asis.fechaJornada).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' })
+            : asis.fechaHoraRegistro
+            ? new Date(asis.fechaHoraRegistro).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' })
+            : 'Día Único',
+          asis.fechaHoraRegistro
+            ? new Date(asis.fechaHoraRegistro).toLocaleString('es-CO', { timeZone: 'America/Bogota' })
+            : '',
+          traducirEtiquetaExcel(asis.metodo, 'QR'),
           asis.registradoPorNombre || 'Staff Oficial',
           asis.observaciones || 'Sin novedades',
           `${ins.totalAsistencias ?? lista.length} de ${ins.asistenciasMinimas ?? 1}`,
-          (ins.cumpleMeta ?? (lista.length >= (ins.asistenciasMinimas ?? 1))) ? 'COMPLETA / CERTIFICABLE' : 'PARCIAL (EN CURSO)',
+          (ins.cumpleMeta ?? lista.length >= (ins.asistenciasMinimas ?? 1))
+            ? 'COMPLETA / CERTIFICABLE'
+            : 'PARCIAL (EN CURSO)',
         ])
       }
     }
 
-    const hoja3Datos = [
-      ['AUDITORÍA DE ASISTENCIA Y CHECK-IN EN PUERTA — UNIVERSIDAD DEL SINÚ'],
-      ['Facultad de Ciencias e Ingenierías'],
-      ['Fecha de Generación:', new Date().toLocaleString('es-CO')],
-      ['Evento Consultado:', eventoInfo],
-      ['Vigencia / Período:', anioFiltro === 'todos' ? 'Histórico Completo' : (semestreFiltro === 'todos' ? `Año ${anioFiltro} (Completo)` : `Año ${anioFiltro} — Semestre ${semestreFiltro}`)],
-      [],
-      [
-        'Cédula / ID',
-        'Nombre del Asistente',
-        'Programa Académico',
-        'Evento Validado',
-        'Jornada / Fecha',
-        'Fecha y Hora Check-in',
-        'Método de Escaneo',
-        'Validado Por (Staff / Docente)',
-        'Observaciones de Entrada',
-        'Progreso Asistencias',
-        'Estado Diploma',
-      ],
-      ...filasAuditoria,
-    ]
-    const ws3 = XLSX.utils.aoa_to_sheet(hoja3Datos)
-    XLSX.utils.book_append_sheet(wb, ws3, 'Auditoría de Asistencia')
+    const ws3 = workbook.addWorksheet('Auditoría de Asistencia')
+    aplicarBannerInstitucional(
+      ws3,
+      'Auditoría de Asistencia y Check-in en Puerta',
+      subtituloComun,
+      encabezadosHoja3.length
+    )
+
+    estilizarTablaCorporativa(ws3, {
+      filaEncabezado: 5,
+      encabezados: encabezadosHoja3,
+      filas: filasAuditoria,
+      columnasEstado: [12],
+      inmovilizar: true,
+      conAutoFiltro: true,
+    })
 
     const prefijoPeriodo =
       anioFiltro === 'todos'
         ? 'Historico'
         : `${anioFiltro}${semestreFiltro !== 'todos' ? `_S${semestreFiltro}` : ''}`
     const nombreArchivo = `Reporte_Auditoria_Unisinu_${prefijoPeriodo}_${Date.now()}.xlsx`
-    XLSX.writeFile(wb, nombreArchivo)
+    await descargarWorkbookExcel(workbook, nombreArchivo)
   }
 
   return (

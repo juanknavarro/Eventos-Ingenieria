@@ -45,9 +45,30 @@ export default async function ControlAsistenciaStaffPage() {
     ? { id: eventoAsignadoStaffId }
     : filtroEventos
 
-  // Consultar eventos activos filtrados por programa o asignación
+  // Inicio del día actual (00:00:00) en zona horaria America/Bogota
+  const ahora = new Date()
+  const fechaBogotaStr = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Bogota',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(ahora)
+  const inicioHoy = new Date(`${fechaBogotaStr}T00:00:00-05:00`)
+
+  // Consultar únicamente eventos activos y publicados filtrados por programa o asignación
   const eventos = await prisma.evento.findMany({
-    where: filtroFinal,
+    where: {
+      AND: [
+        filtroFinal,
+        { estado: 'PUBLICADO' },
+        {
+          OR: [
+            { fechaFin: { gte: ahora } },
+            { fechaInicio: { gte: inicioHoy } },
+          ],
+        },
+      ],
+    },
     select: {
       id: true,
       titulo: true,

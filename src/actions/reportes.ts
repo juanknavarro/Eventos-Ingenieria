@@ -235,3 +235,173 @@ export async function obtenerAnaliticasReportes(
     },
   }
 }
+
+export interface FilaAsistenteExcel {
+  consecutivo: number
+  cedula: string
+  codigoEstudiantil: string
+  nombreCompleto: string
+  email: string
+  celular: string
+  tipoVinculacion: string
+  carrera: string
+  semestre: string
+  asignaturaBonificacion: string
+  empresa: string
+  pais: string
+  departamento: string
+  ciudad: string
+  fechaInscripcion: string
+  estadoPago: string
+  metodoPago: string
+  montoPagado: number
+  comprobanteUrl: string
+  docenteResponsable: string
+  asistenciasRegistradas: number
+  asistenciasMinimas: number
+  detalleIngresos: string
+  estadoCertificacion: 'Apto' | 'Pendiente'
+}
+
+/**
+ * Exporta la sábana completa de asistentes e inscripciones de un evento específico.
+ * Exclusivo para roles ADMIN y SUPER_ADMIN respetando aislamiento Multi-Tenancy.
+ */
+export async function exportarAsistentesEventoExcel(eventoId: string): Promise<
+  | {
+      success: true
+      evento: {
+        id: string
+        titulo: string
+        fechaInicio: string
+        ubicacion: string
+        precio: number
+        asistenciasMinimas: number
+      }
+      filas: FilaAsistenteExcel[]
+    }
+  | {
+      success: false
+      error: string
+    }
+> {
+  try {
+    const sesion = await getAuthSession()
+    if (!sesion || (sesion.rol !== 'ADMIN' && sesion.rol !== 'SUPER_ADMIN')) {
+      return { success: false, error: 'No autorizado' }
+    }
+
+    if (!eventoId || !eventoId.trim()) {
+      return { success: false, error: 'Identificador de evento inválido.' }
+    }
+
+    const filtroTenancy = filtroEventosPorTenancy(sesion)
+
+    const evento = await prisma.evento.findFirst({
+      where: {
+        AND: [filtroTenancy, { id: eventoId.trim() }],
+      },
+      include: {
+        inscripciones: {
+          include: {
+            usuario: true,
+            profesorResponsable: {
+              select: { nombre: true },
+            },
+            asistencias: {
+              orderBy: { fechaHoraRegistro: 'asc' },
+            },
+          },
+          orderBy: {
+            usuario: { nombre: 'asc' },
+          },
+        },
+      },
+    })
+
+    if (!evento) {
+      return {
+        success: false,
+        error: 'Evento no encontrado o sin permisos para consultarlo.',
+      }
+    }
+
+    const asistenciasMinimas = evento.asistenciasMinimas ?? 1
+
+    const filas: FilaAsistenteExcel[] = evento.inscripciones.map((ins, idx) => {
+      const totalAsistencias = ins.asistencias.length
+      const estaSolvente =
+        evento.precio === 0 ||
+        ins.estado_pago === 'PAGADO' ||
+        ins.estado_pago === 'EXENTO'
+      const esApto = totalAsistencias >= asistenciasMinimas && estaSolvente
+
+      const detalleIngresos =
+        ins.asistencias.length > 0
+          ? ins.asistencias
+              .map((a) => {
+                const hora = new Date(a.fechaHoraRegistro).toLocaleString('es-CO', {
+                  timeZone: 'America/Bogota',
+                  dateStyle: 'short',
+                  timeStyle: 'short',
+                })
+                return `${a.bloque} / ${a.metodo} / ${hora}`
+              })
+              .join(' | ')
+          : 'Sin registros'
+
+      return {
+        consecutivo: idx + 1,
+        cedula: ins.usuario.cedula || ins.usuario.codigoEstudiantil || 'N/A',
+        codigoEstudiantil: ins.usuario.codigoEstudiantil || 'N/A',
+        nombreCompleto: ins.usuario.nombre,
+        email: ins.usuario.email,
+        celular: ins.celular || ins.usuario.telefono || 'N/A',
+        tipoVinculacion: ins.tipo_vinculacion || ins.usuario.tipo_vinculacion || 'ESTUDIANTE_ACTIVO',
+        carrera: ins.usuario.carrera || 'N/A',
+        semestre: ins.usuario.semestre || 'N/A',
+        asignaturaBonificacion: ins.asignatura_bonificacion || 'N/A',
+        empresa: ins.empresa || ins.usuario.empresa || 'N/A',
+        pais: ins.pais || ins.usuario.pais || 'Colombia',
+        departamento: ins.departamento || ins.usuario.departamento || 'N/A',
+        ciudad: ins.ciudad || ins.usuario.ciudad || 'N/A',
+        fechaInscripcion: new Date(ins.fechaInscripcion).toLocaleString('es-CO', {
+          timeZone: 'America/Bogota',
+          dateStyle: 'short',
+          timeStyle: 'short',
+        }),
+        estadoPago: ins.estado_pago,
+        metodoPago: ins.metodo_pago || (evento.precio === 0 ? 'GRATUITO' : 'N/A'),
+        montoPagado: ins.montoPagado,
+        comprobanteUrl: ins.comprobanteUrl || 'N/A',
+        docenteResponsable:
+          ins.profesorResponsable?.nombre ||
+          ins.profesor_responsable_dinero ||
+          'Sin asignar',
+        asistenciasRegistradas: totalAsistencias,
+        asistenciasMinimas,
+        detalleIngresos,
+        estadoCertificacion: esApto ? 'Apto' : 'Pendiente',
+      }
+    })
+
+    return {
+      success: true,
+      evento: {
+        id: evento.id,
+        titulo: evento.titulo,
+        fechaInicio: evento.fechaInicio.toISOString(),
+        ubicacion: evento.ubicacion,
+        precio: evento.precio,
+        asistenciasMinimas,
+      },
+      filas,
+    }
+  } catch (error) {
+    console.error('Error al exportar asistentes a Excel:', error)
+    return {
+      success: false,
+      error: 'Ocurrió un error en el servidor al generar la exportación.',
+    }
+  }
+}

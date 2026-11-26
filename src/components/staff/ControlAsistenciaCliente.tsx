@@ -264,7 +264,7 @@ export default function ControlAsistenciaCliente({
   const procesarValidacion = useCallback(
     async (valorBruto: string, metodoDetectado: 'QR' | 'MANUAL' | 'CODIGO_BARRAS') => {
       const valor = valorBruto.trim()
-      if (!valor || procesando) return
+      if (!valor || procesando || !eventoId) return
 
       setProcesando(true)
       setDocumentoInput('')
@@ -417,21 +417,28 @@ export default function ControlAsistenciaCliente({
               Control de Puerta para el Evento
             </span>
             <div className="mt-0.5">
-              <select
-                id="select-evento-asistencia"
-                value={eventoId}
-                onChange={(e) => {
-                  setEventoId(e.target.value)
-                  setUltimoResultado(null)
-                }}
-                className="text-sm font-extrabold text-slate-900 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl px-3.5 py-2 focus:ring-2 focus:ring-emerald-500 outline-none transition cursor-pointer"
-              >
-                {eventos.map((ev) => (
-                  <option key={ev.id} value={ev.id}>
-                    {ev.titulo} &bull; ({ev.ubicacion})
-                  </option>
-                ))}
-              </select>
+              {eventos.length === 0 ? (
+                <div className="text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>No hay eventos activos en curso en este momento.</span>
+                </div>
+              ) : (
+                <select
+                  id="select-evento-asistencia"
+                  value={eventoId}
+                  onChange={(e) => {
+                    setEventoId(e.target.value)
+                    setUltimoResultado(null)
+                  }}
+                  className="text-sm font-extrabold text-slate-900 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl px-3.5 py-2 focus:ring-2 focus:ring-emerald-500 outline-none transition cursor-pointer"
+                >
+                  {eventos.map((ev) => (
+                    <option key={ev.id} value={ev.id}>
+                      {ev.titulo} &bull; ({ev.ubicacion})
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
         </div>
@@ -541,6 +548,14 @@ export default function ControlAsistenciaCliente({
 
           {/* Formulario de Escaneo con Autofoco Blindado */}
           <form onSubmit={handleEscaneo} className="max-w-xl mx-auto pt-2 space-y-3">
+            {eventos.length === 0 && (
+              <div className="p-3 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-200 text-xs font-bold flex items-center justify-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>
+                  Escaneo deshabilitado: no hay eventos publicados activos o vigentes en curso.
+                </span>
+              </div>
+            )}
             <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-emerald-400 transition-colors">
                 <ScanBarcode className="w-6 h-6" />
@@ -549,6 +564,7 @@ export default function ControlAsistenciaCliente({
                 ref={inputRef}
                 type="text"
                 value={documentoInput}
+                disabled={eventos.length === 0 || procesando}
                 onKeyDown={(e) => {
                   if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
                     const ahora = performance.now()
@@ -568,16 +584,20 @@ export default function ControlAsistenciaCliente({
                 }}
                 autoFocus
                 autoComplete="off"
-                placeholder="Esperando código de barras, QR o cédula..."
-                className="w-full pl-13 pr-28 py-4 bg-white/10 hover:bg-white/15 focus:bg-white text-white focus:text-slate-900 text-lg sm:text-xl font-mono font-bold rounded-2xl border-2 border-indigo-400/40 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400 shadow-inner"
+                placeholder={
+                  eventos.length === 0
+                    ? 'Sin eventos activos disponibles...'
+                    : 'Esperando código de barras, QR o cédula...'
+                }
+                className="w-full pl-13 pr-28 py-4 bg-white/10 hover:bg-white/15 focus:bg-white text-white focus:text-slate-900 text-lg sm:text-xl font-mono font-bold rounded-2xl border-2 border-indigo-400/40 focus:border-emerald-500 outline-none transition-all placeholder:text-slate-400 shadow-inner disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <button
                 type="submit"
                 onClick={() => {
                   envioPorBotonRef.current = true
                 }}
-                disabled={procesando || !documentoInput.trim()}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-700 text-white font-bold text-xs rounded-xl shadow transition cursor-pointer"
+                disabled={eventos.length === 0 || procesando || !documentoInput.trim()}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-700 text-white font-bold text-xs rounded-xl shadow transition cursor-pointer disabled:cursor-not-allowed"
               >
                 {procesando ? 'Validando...' : 'Validar'}
               </button>
@@ -586,8 +606,9 @@ export default function ControlAsistenciaCliente({
             <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
               <button
                 type="button"
+                disabled={eventos.length === 0}
                 onClick={() => setCamaraAbierta((prev) => !prev)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-bold text-white transition cursor-pointer"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed border border-white/20 text-xs font-bold text-white transition cursor-pointer"
               >
                 <Camera className="w-4 h-4 text-emerald-300" />
                 <span>{camaraAbierta ? 'Cerrar Cámara QR' : 'Escanear con Cámara'}</span>
